@@ -51,25 +51,34 @@ pip install api-watch[all]
 ```python
 from flask import Flask
 from apiwatch import ApiWatcher
-from apiwatch.middleware_flask import FlaskWatchdogMiddleware
+from apiwatch.middleware_flask import FlaskWatchMiddleware
 
 app = Flask(__name__)
 
 # Dashboard auto-starts
 api_watcher = ApiWatcher(service_name='my-flask-app')
-FlaskWatchdogMiddleware(app, api_watcher)
+FlaskWatchMiddleware(app, api_watcher)
 
-@app.route('/api/users')
-def get_users():
-    return {"users": [...]}
+@app.route('/api/health', methods=['GET'])
+def health():
+    return jsonify({
+        "status": "healthy",
+        "service": "flask-service"
+    })
 
 if __name__ == '__main__':
     app.run(port=5000)
 ```
 
-**Run it:**
+**Terminal run:**
 ```bash
-python app.py
+python -m apiwatch
+```
+
+**Docker run: easiest**
+```bash
+docker pull theisaac/api-watch:latest
+docker compose up -d 
 ```
 
 **Open dashboard:**
@@ -83,18 +92,30 @@ http://localhost:22222
 
 ```python
 from fastapi import FastAPI
+from pydantic import BaseModel
 from apiwatch import ApiWatcher
-from apiwatch.middleware_fastapi import FastapiwatchMiddleware
+from apiwatch.middleware_fastapi import FastAPIWatchMiddleware
 
 app = FastAPI()
 
-# Dashboard auto-starts
-api_watcher = ApiWatcher(service_name='my-fastapi-app')
-app.add_middleware(FastapiwatchMiddleware, watcher=api_watcher)
+api_watcher = ApiWatcher(
+    service_name='fastapi-service',
+    dashboard_host='localhost',
+    auto_start_dashboard=False
+)
 
-@app.get("/api/users")
-async def get_users():
-    return {"users": [...]}
+app.add_middleware(FastAPIWatchMiddleware, watcher=api_watcher)
+
+@app.get("/api/health")
+async def health():
+    return {
+        "status": "healthy",
+        "service": "fastapi-service"
+    }
+
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
 
 **Run it:**
@@ -166,7 +187,7 @@ api_watcher = ApiWatcher(
 
 **Flask:**
 ```python
-FlaskWatchdogMiddleware(
+FlaskWatchMiddleware(
     app, 
     api_watcher,
     capture_request_body=True,   # Log request bodies
@@ -177,7 +198,7 @@ FlaskWatchdogMiddleware(
 **FastAPI:**
 ```python
 app.add_middleware(
-    FastapiwatchMiddleware,
+    FastAPIWatchMiddleware,
     watcher=api_watcher,
     capture_request_body=True,   # Log request bodies
     capture_response_body=True   # Log response bodies
