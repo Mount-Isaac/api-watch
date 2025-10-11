@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "api-watch"
-version = "0.1.0"
+version = "0.1.2"
 description = "Real-time API monitoring for Flask/FastAPI with async, zero-blocking logging"
 readme = "README.md"
 authors = [
@@ -33,11 +33,26 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+flask = [
+    "flask>=2.0.0",
+]
+fastapi = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+]
+all = [
+    "flask>=2.0.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.20.0",
-    "black>=22.0.0",
-    "flake8>=5.0.0",
+    "pytest>=7.0",
+    "black>=23.0",
+    "flask>=2.0.0",
+    "flake8>=6.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "mypy>=1.0",
 ]
 
 [project.urls]

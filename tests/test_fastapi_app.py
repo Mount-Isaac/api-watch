@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from apiwatch import ApiWatcher
-from apiwatch.middleware_fastapi import FastAPIWatchdogMiddleware
+from apiwatch.middleware_fastapi import FastAPIWatchMiddleware
 
 
 app = FastAPI()
@@ -13,7 +13,7 @@ api_watcher = ApiWatcher(
     dashboard_port=22222
 )
 
-app.add_middleware(FastAPIWatchdogMiddleware, watcher=api_watcher)
+app.add_middleware(FastAPIWatchMiddleware, watcher=api_watcher)
 
 
 class HelloRequest(BaseModel):

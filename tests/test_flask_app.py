@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request
 from apiwatch import ApiWatcher
-from apiwatch.middleware_flask import FlaskWatchDogMiddleware
+from apiwatch.middleware_flask import FlaskWatchMiddleware
 
 
 app = Flask(__name__)
@@ -12,7 +12,7 @@ api_watcher = ApiWatcher(
     dashboard_port=22222
 )
 
-FlaskWatchDogMiddleware(app, api_watcher)
+FlaskWatchMiddleware(app, api_watcher)
 
 
 @app.route('/api/health', methods=['GET'])

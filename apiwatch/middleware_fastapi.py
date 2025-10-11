@@ -16,7 +16,7 @@ if not FASTAPI_AVAILABLE:
     )
 
 
-class FastAPIWatchdogMiddleware(BaseHTTPMiddleware):
+class FastAPIWatchMiddleware(BaseHTTPMiddleware):
     """FastAPI middleware for ApiWatchdog - optimized for zero blocking"""
     
     def __init__(self, app, watcher, capture_request_body=True, capture_response_body=True):

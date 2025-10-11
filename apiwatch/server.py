@@ -175,7 +175,7 @@ def start_dashboard_server(host='0.0.0.0', port=22222, username='admin', passwor
         def run_server():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            server = DashboardServer(host, port, username, password)
+            server = DashboardServer(host=host, port=port, username=username, password=password)
             loop.run_until_complete(server.start())
             loop.run_forever()
         

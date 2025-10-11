@@ -14,7 +14,7 @@ if not FLASK_AVAILABLE:
         "Flask is not installed. Intall with pip install api-watch-dog[flask]"
     )
 
-class FlaskWatchDogMiddleware:
+class FlaskWatchMiddleware:
     """Flask middleware for ApiWatchdog - optimized for zero blocking"""
 
     def __init__(self, app, watcher, capture_request_body=True, capture_response_body=True):
