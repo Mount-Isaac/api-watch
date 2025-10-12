@@ -2,7 +2,6 @@ services:
   apiwatch:
     # image: theisaac/api-watch:latest
     build: .
-    container_name: apiwatch
     ports:
       - "22222:22222"
     restart: unless-stopped
