@@ -9,10 +9,12 @@ import os
 if __name__ == '__main__':
     username = os.getenv('WATCHDOG_USERNAME', 'admin')
     password = os.getenv('WATCHDOG_PASSWORD', 'admin')
+    host = os.getenv('API_WATCH_DASHBOARD_HOST', '127.0.0.1')
+    port = os.getenv('API_WATCH_DASHBOARD_PORT', 22222)
     
     asyncio.run(run_standalone(
-        host='0.0.0.0', 
-        port=22222, 
+        host=host,
+        port=int(port), 
         username=username, 
         password=password
     ))
