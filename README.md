@@ -235,6 +235,8 @@ services:
   apiwatch:
     image: theisaac/api-watch:latest
     container_name: apiwatch
+    networks: 
+     - test-network
     ports:
       - "22222:22222"
     restart: unless-stopped
@@ -242,9 +244,31 @@ services:
       - PYTHONUNBUFFERED=1
       - WATCHDOG_USERNAME=admin
       - WATCHDOG_PASSWORD=admin
+      - API_WATCH_DASHBOARD_HOST=0.0.0.
+      - API_WATCH_DASHBOARD_PORT=22222
     command: python -m apiwatch
 
 ```
+
+```yaml
+services:
+  test_flask_app:
+    image: theisaac/files-webapp:latest
+    restart: always
+    networks:
+      - test-network
+    environment:
+      - API_WATCH_MAX_HISTORY=3000
+      - API_WATCH_DASHBOARD_HOST=apiwatch
+      - API_WATCH_DASHBOARD_PORT=22222
+      - API_WATCH_AUTO_START=false 
+    ports:
+      - 1515:1515
+
+#### NOTE
+In Dockerized applications, ensure that the **apiwatch** container and your **Flask/FastAPI** containers are on the same network.  
+Also, use the container name `apiwatch` as the host name in your Flask app.
+
 
 **Service code:**
 ```python
