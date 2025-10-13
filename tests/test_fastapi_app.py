@@ -10,7 +10,8 @@ app = FastAPI()
 api_watcher = ApiWatcher(
     service_name='fastapi-service',
     dashboard_host='localhost',
-    dashboard_port=22222
+    dashboard_port=22222,
+    auto_start_dashboard=False
 )
 
 app.add_middleware(FastAPIWatchMiddleware, watcher=api_watcher)

@@ -9,7 +9,8 @@ app = Flask(__name__)
 api_watcher = ApiWatcher(
     service_name='flask-service',
     dashboard_host='localhost',
-    dashboard_port=22222
+    dashboard_port=22222,
+    auto_start_dashboard=False
 )
 
 FlaskWatchMiddleware(app, api_watcher)
