@@ -9,7 +9,7 @@
 A lightweight, developer-focused tool that streams your API requests, responses, and metadata to a beautiful real-time dashboard. Perfect for debugging, development, and understanding your API traffic.
 
 <!-- ![api-watch Dashboard](./images/watch.png) -->
-![api-watch Dashboard](https://drive.google.com/file/d/18w0XTfgWU4fhFv9mO6Cjc92fkqmvysrQ/view)
+![api-watch Dashboard](https://drive.google.com/uc?export=view&id=18w0XTfgWU4fhFv9mO6Cjc92fkqmvysrQ)
 
 ---
 
