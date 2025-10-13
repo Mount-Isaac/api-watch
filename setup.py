@@ -13,7 +13,7 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/mount-isaac/api-watch',
-    packages=find_packages(),
+    packages=find_packages(exclude=['tests', 'test_.*']),
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
