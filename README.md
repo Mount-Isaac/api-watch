@@ -1,6 +1,6 @@
 # api-watch
 
-**Real-time API monitoring for Flask/FastAPI with zero-blocking async logging**
+**Real-time API monitoring for Flask and FastAPI with zero-blocking async logging**
 
 [![PyPI Version](https://img.shields.io/pypi/v/api-watch.svg)](https://pypi.org/project/api-watch/)
 [![Python Support](https://img.shields.io/pypi/pyversions/rabbitmq-easy.svg)](https://pypi.org/project/rabbitmq-easy/)
