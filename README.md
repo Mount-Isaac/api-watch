@@ -2,7 +2,7 @@
 
 **Real-time API monitoring for Flask/FastAPI with zero-blocking async logging**
 
-[![PyPI version](https://badge.fury.io/py/api-watch.svg)](https://badge.fury.io/py/api-watch)
+[![PyPI Version](https://img.shields.io/pypi/v/api-watch.svg)](https://pypi.org/project/api-watch/)
 [![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
