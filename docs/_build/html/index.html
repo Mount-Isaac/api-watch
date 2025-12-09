@@ -1,0 +1,476 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>api-watch documentation &mdash; api-watch 0.1.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=fd825880"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="API Reference" href="api.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="#" class="icon icon-home">
+            api-watch
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">api-watch documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api.html#apiwatcher">ApiWatcher</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#apiwatch.ApiWatcher"><code class="docutils literal notranslate"><span class="pre">ApiWatcher</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api.html#apiwatch.ApiWatcher.clear_history"><code class="docutils literal notranslate"><span class="pre">ApiWatcher.clear_history()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api.html#apiwatch.ApiWatcher.get_history"><code class="docutils literal notranslate"><span class="pre">ApiWatcher.get_history()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api.html#apiwatch.ApiWatcher.log_request"><code class="docutils literal notranslate"><span class="pre">ApiWatcher.log_request()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="api.html#apiwatch.ApiWatcher.shutdown"><code class="docutils literal notranslate"><span class="pre">ApiWatcher.shutdown()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-apiwatch.middleware_flask">Flask Middleware</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#apiwatch.middleware_flask.FlaskWatchMiddleware"><code class="docutils literal notranslate"><span class="pre">FlaskWatchMiddleware</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#apiwatch.middleware_flask.watch_route"><code class="docutils literal notranslate"><span class="pre">watch_route()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-apiwatch.middleware_fastapi">FastAPI Middleware</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#apiwatch.middleware_fastapi.FastAPIWatchMiddleware"><code class="docutils literal notranslate"><span class="pre">FastAPIWatchMiddleware</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="api.html#apiwatch.middleware_fastapi.FastAPIWatchMiddleware.dispatch"><code class="docutils literal notranslate"><span class="pre">FastAPIWatchMiddleware.dispatch()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">api-watch</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">api-watch documentation</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/mount-isaac/api-watch/blob/main/docs/index.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api-watch-documentation">
+<h1>api-watch documentation<a class="headerlink" href="#api-watch-documentation" title="Link to this heading"></a></h1>
+<p>Add your content using <code class="docutils literal notranslate"><span class="pre">reStructuredText</span></code> syntax. See the
+<a class="reference external" href="https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html">reStructuredText</a>
+documentation for details.</p>
+<div class="toctree-wrapper compound">
+</div>
+<section id="api-watch">
+<h2>api-watch<a class="headerlink" href="#api-watch" title="Link to this heading"></a></h2>
+<p><strong>Real-time API monitoring for Flask and FastAPI with zero-blocking async logging</strong></p>
+<p><a class="reference external" href="https://pypi.org/project/api-watch/"><img alt="PyPI Version" src="https://img.shields.io/pypi/v/api-watch.svg" /></a>
+<a class="reference external" href="https://pypi.org/project/rabbitmq-easy/"><img alt="Python Support" src="https://img.shields.io/pypi/pyversions/rabbitmq-easy.svg" /></a>
+<a class="reference external" href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg" /></a></p>
+<p>A lightweight, developer-focused tool that streams your API requests, responses, and metadata to a beautiful real-time dashboard. Perfect for debugging, development, and understanding your API traffic.</p>
+<p><img alt="api-watch Dashboard" src="images/api_watch.gif" /></p>
+<hr class="docutils" />
+<section id="features">
+<h3>Features<a class="headerlink" href="#features" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Zero Performance Impact</strong> - Fire-and-forget async logging that never blocks your API</p></li>
+<li><p><strong>Real-time Streaming</strong> - WebSocket-powered dashboard shows requests as they happen</p></li>
+<li><p><strong>Auto-Start Dashboard</strong> - Just import and use, dashboard starts automatically</p></li>
+<li><p><strong>Full Visibility</strong> - Method, path, status, timing, headers, request/response data</p></li>
+<li><p><strong>Filter by Status</strong> - Quickly filter requests by status code</p></li>
+<li><p><strong>Request Statistics</strong> - Visual metrics and charts</p></li>
+<li><p><strong>Minimal UI</strong> - Clean, fast dashboard focused on what matters</p></li>
+<li><p><strong>Multi-Framework</strong> - Works with Flask and FastAPI</p></li>
+<li><p><strong>Production Ready</strong> - Standalone mode for Docker/Kubernetes</p></li>
+<li><p><strong>Optimized Dependencies</strong> - Only install what you need</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="quick-start">
+<h3>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading"></a></h3>
+<section id="installation">
+<h4>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h4>
+<p><strong>For Flask:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>api-watch<span class="o">[</span>flask<span class="o">]</span>
+</pre></div>
+</div>
+<p><strong>For FastAPI:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>api-watch<span class="o">[</span>fastapi<span class="o">]</span>
+</pre></div>
+</div>
+<p><strong>For both:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>api-watch<span class="o">[</span>all<span class="o">]</span>
+</pre></div>
+</div>
+</section>
+<section id="flask-integration-auto-start">
+<h4>Flask Integration (Auto-Start)<a class="headerlink" href="#flask-integration-auto-start" title="Link to this heading"></a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">flask</span><span class="w"> </span><span class="kn">import</span> <span class="n">Flask</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">apiwatch</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApiWatcher</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">apiwatch.middleware_flask</span><span class="w"> </span><span class="kn">import</span> <span class="n">FlaskWatchMiddleware</span>
+
+<span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># Dashboard auto-starts</span>
+<span class="n">api_watcher</span> <span class="o">=</span> <span class="n">ApiWatcher</span><span class="p">(</span><span class="n">service_name</span><span class="o">=</span><span class="s1">&#39;my-flask-app&#39;</span><span class="p">)</span>
+<span class="n">FlaskWatchMiddleware</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="n">api_watcher</span><span class="p">)</span>
+
+<span class="nd">@app</span><span class="o">.</span><span class="n">route</span><span class="p">(</span><span class="s1">&#39;/api/health&#39;</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;GET&#39;</span><span class="p">])</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">health</span><span class="p">():</span>
+    <span class="k">return</span> <span class="n">jsonify</span><span class="p">({</span>
+        <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="s2">&quot;healthy&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;service&quot;</span><span class="p">:</span> <span class="s2">&quot;flask-service&quot;</span>
+    <span class="p">})</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">app</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">port</span><span class="o">=</span><span class="mi">5000</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Terminal run:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>apiwatch
+</pre></div>
+</div>
+<p><strong>Docker run: easiest</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>pull<span class="w"> </span>theisaac/api-watch:latest
+docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+</pre></div>
+</div>
+<p><strong>Open dashboard:</strong></p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">localhost</span><span class="p">:</span><span class="mi">22222</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="fastapi-integration">
+<h4>FastAPI Integration<a class="headerlink" href="#fastapi-integration" title="Link to this heading"></a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">fastapi</span><span class="w"> </span><span class="kn">import</span> <span class="n">FastAPI</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">apiwatch</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApiWatcher</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">apiwatch.middleware_fastapi</span><span class="w"> </span><span class="kn">import</span> <span class="n">FastAPIWatchMiddleware</span>
+
+<span class="n">app</span> <span class="o">=</span> <span class="n">FastAPI</span><span class="p">()</span>
+
+<span class="n">api_watcher</span> <span class="o">=</span> <span class="n">ApiWatcher</span><span class="p">(</span>
+    <span class="n">service_name</span><span class="o">=</span><span class="s1">&#39;fastapi-service&#39;</span><span class="p">,</span>
+    <span class="n">dashboard_host</span><span class="o">=</span><span class="s1">&#39;localhost&#39;</span><span class="p">,</span>
+    <span class="n">auto_start_dashboard</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+
+<span class="n">app</span><span class="o">.</span><span class="n">add_middleware</span><span class="p">(</span><span class="n">FastAPIWatchMiddleware</span><span class="p">,</span> <span class="n">watcher</span><span class="o">=</span><span class="n">api_watcher</span><span class="p">)</span>
+
+<span class="nd">@app</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;/api/health&quot;</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">health</span><span class="p">():</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="s2">&quot;healthy&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;service&quot;</span><span class="p">:</span> <span class="s2">&quot;fastapi-service&quot;</span>
+    <span class="p">}</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">uvicorn</span>
+    <span class="n">uvicorn</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">8000</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Run it:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>uvicorn<span class="w"> </span>app:app<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="dashboard-features">
+<h3>📊 Dashboard Features<a class="headerlink" href="#dashboard-features" title="Link to this heading"></a></h3>
+<section id="real-time-request-monitoring">
+<h4>Real-time Request Monitoring<a class="headerlink" href="#real-time-request-monitoring" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p>✅ Live streaming of API requests</p></li>
+<li><p>✅ Color-coded HTTP methods (GET, POST, PUT, DELETE)</p></li>
+<li><p>✅ Status code highlighting (success/error)</p></li>
+<li><p>✅ Response time tracking</p></li>
+<li><p>✅ Service name badges (multi-service support)</p></li>
+</ul>
+</section>
+<section id="filters-search">
+<h4>Filters &amp; Search<a class="headerlink" href="#filters-search" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p>Filter by status code (2xx, 3xx, 4xx, 5xx, All)</p></li>
+<li><p>Sort by newest, oldest, fastest, sloweset, status(high-low)</p></li>
+<li><p>Filter by HTTP method</p></li>
+</ul>
+</section>
+<section id="request-details">
+<h4>Request Details<a class="headerlink" href="#request-details" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p>Full request/response bodies</p></li>
+<li><p>Query parameters</p></li>
+<li><p>Headers (sensitive headers filtered)</p></li>
+<li><p>Timestamp and duration</p></li>
+</ul>
+</section>
+</section>
+<hr class="docutils" />
+<section id="use-cases">
+<h3>Use Cases<a class="headerlink" href="#use-cases" title="Link to this heading"></a></h3>
+<section id="development-debugging">
+<h4>Development &amp; Debugging<a class="headerlink" href="#development-debugging" title="Link to this heading"></a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># See exactly what&#39;s hitting your API in real-time</span>
+<span class="c1"># No more print() debugging!</span>
+</pre></div>
+</div>
+</section>
+<section id="api-testing">
+<h4>API Testing<a class="headerlink" href="#api-testing" title="Link to this heading"></a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Watch your integration tests run</span>
+<span class="c1"># Verify request/response data instantly</span>
+</pre></div>
+</div>
+</section>
+<section id="microservices-monitoring">
+<h4>Microservices Monitoring<a class="headerlink" href="#microservices-monitoring" title="Link to this heading"></a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Monitor traffic between multiple services</span>
+<span class="c1"># Debug complex request flows</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="configuration">
+<h3>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h3>
+<section id="basic-options">
+<h4>Basic Options<a class="headerlink" href="#basic-options" title="Link to this heading"></a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">api_watcher</span> <span class="o">=</span> <span class="n">ApiWatcher</span><span class="p">(</span>
+    <span class="n">service_name</span><span class="o">=</span><span class="s1">&#39;my-app&#39;</span><span class="p">,</span>           <span class="c1"># Service identifier</span>
+    <span class="n">max_history</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>                <span class="c1"># Requests to keep in memory</span>
+    <span class="n">dashboard_host</span><span class="o">=</span><span class="s1">&#39;localhost&#39;</span><span class="p">,</span>      <span class="c1"># Dashboard host</span>
+    <span class="n">dashboard_port</span><span class="o">=</span><span class="mi">22222</span><span class="p">,</span>            <span class="c1"># Dashboard port</span>
+    <span class="n">auto_start_dashboard</span><span class="o">=</span><span class="kc">True</span>        <span class="c1"># Auto-start if not running</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="middleware-options">
+<h4>Middleware Options<a class="headerlink" href="#middleware-options" title="Link to this heading"></a></h4>
+<p><strong>Flask:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">FlaskWatchMiddleware</span><span class="p">(</span>
+    <span class="n">app</span><span class="p">,</span>
+    <span class="n">api_watcher</span><span class="p">,</span>
+    <span class="n">capture_request_body</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>   <span class="c1"># Log request bodies</span>
+    <span class="n">capture_response_body</span><span class="o">=</span><span class="kc">True</span>   <span class="c1"># Log response bodies</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>FastAPI:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">app</span><span class="o">.</span><span class="n">add_middleware</span><span class="p">(</span>
+    <span class="n">FastAPIWatchMiddleware</span><span class="p">,</span>
+    <span class="n">watcher</span><span class="o">=</span><span class="n">api_watcher</span><span class="p">,</span>
+    <span class="n">capture_request_body</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>   <span class="c1"># Log request bodies</span>
+    <span class="n">capture_response_body</span><span class="o">=</span><span class="kc">True</span>   <span class="c1"># Log response bodies</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="production-deployment">
+<h3>Production Deployment<a class="headerlink" href="#production-deployment" title="Link to this heading"></a></h3>
+<section id="standalone-mode">
+<h4>Standalone Mode<a class="headerlink" href="#standalone-mode" title="Link to this heading"></a></h4>
+<p>For production, run the dashboard as a separate service:</p>
+<p><strong>Terminal 1: Start Dashboard</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>apiwatch
+</pre></div>
+</div>
+<p><strong>Terminal 2: Start Your App</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">apiwatch</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApiWatcher</span>
+
+<span class="n">api_watcher</span> <span class="o">=</span> <span class="n">ApiWatcher</span><span class="p">(</span>
+    <span class="n">service_name</span><span class="o">=</span><span class="s1">&#39;my-app&#39;</span><span class="p">,</span>
+    <span class="n">auto_start_dashboard</span><span class="o">=</span><span class="kc">False</span>  <span class="c1"># Don&#39;t auto-start in production</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="docker-compose">
+<h4>Docker Compose<a class="headerlink" href="#docker-compose" title="Link to this heading"></a></h4>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">services</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">apiwatch</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">theisaac/api-watch:latest</span>
+<span class="w">    </span><span class="nt">container_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apiwatch</span>
+<span class="w">    </span><span class="nt">networks</span><span class="p">:</span>
+<span class="w">     </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test-network</span>
+<span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;22222:22222&quot;</span>
+<span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+<span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PYTHONUNBUFFERED=1</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHDOG_USERNAME=admin</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHDOG_PASSWORD=admin</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">API_WATCH_DASHBOARD_HOST=0.0.0.</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">API_WATCH_DASHBOARD_PORT=22222</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python -m apiwatch</span>
+</pre></div>
+</div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">services</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">test_flask_app</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">theisaac/files-webapp:latest</span>
+<span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">always</span>
+<span class="w">    </span><span class="nt">networks</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test-network</span>
+<span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">API_WATCH_MAX_HISTORY=3000</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">API_WATCH_DASHBOARD_HOST=apiwatch</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">API_WATCH_DASHBOARD_PORT=22222</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">API_WATCH_AUTO_START=false</span>
+<span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1515:1515</span>
+
+<span class="c1">#### NOTE</span>
+<span class="l l-Scalar l-Scalar-Plain">In Dockerized applications, ensure that the **apiwatch** container and your **Flask/FastAPI** containers are on the same network.</span>
+<span class="l l-Scalar l-Scalar-Plain">Also, use the container name `apiwatch` as the host name in your Flask app.</span>
+
+
+<span class="err">*</span><span class="nv">*Service</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">code:**</span>
+<span class="err">```</span><span class="l l-Scalar l-Scalar-Plain">python</span>
+<span class="l l-Scalar l-Scalar-Plain">import os</span>
+<span class="l l-Scalar l-Scalar-Plain">from apiwatch import ApiWatcher</span>
+
+<span class="l l-Scalar l-Scalar-Plain">api_watcher = ApiWatcher(</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">service_name=os.getenv(&#39;SERVICE_NAME&#39;, &#39;api-service&#39;),</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">dashboard_host=os.getenv(&#39;WATCHDOG_HOST&#39;, &#39;localhost&#39;),</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">dashboard_port=int(os.getenv(&#39;WATCHDOG_PORT&#39;, 22222)),</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">auto_start_dashboard=False</span>
+<span class="l l-Scalar l-Scalar-Plain">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="how-it-works">
+<h3>How It Works<a class="headerlink" href="#how-it-works" title="Link to this heading"></a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>Flask/FastAPI Request
+        ↓
+   Middleware intercepts
+        ↓
+   Queue.put_nowait() (non-blocking, &lt;0.1ms)
+        ↓
+   App continues normally
+        ↓
+Background Async Worker
+        ↓
+HTTP POST to Dashboard
+        ↓
+Dashboard broadcasts via WebSocket
+        ↓
+Browser UI updates in real-time
+</pre></div>
+</div>
+<p><strong>Zero blocking!</strong> Your API never waits for logging.</p>
+</section>
+<hr class="docutils" />
+<section id="requirements">
+<h3>Requirements<a class="headerlink" href="#requirements" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Python 3.7+</p></li>
+<li><p>aiohttp 3.8+ (always required)</p></li>
+<li><p>Flask 2.0+ (optional - only for Flask integration)</p></li>
+<li><p>FastAPI 0.68+ &amp; Starlette 0.14+ (optional - only for FastAPI integration)</p></li>
+</ul>
+</section>
+</section>
+</section>
+<hr class="docutils" />
+<section id="welcome-to-api-watch-documentation">
+<h1>Welcome to api-watch documentation!<a class="headerlink" href="#welcome-to-api-watch-documentation" title="Link to this heading"></a></h1>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">api-watch documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api.html#apiwatcher">ApiWatcher</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-apiwatch.middleware_flask">Flask Middleware</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-apiwatch.middleware_fastapi">FastAPI Middleware</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="api.html" class="btn btn-neutral float-right" title="API Reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Isaac Kyalo.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
