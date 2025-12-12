@@ -17,7 +17,7 @@ let stats = {
 };
 let all_requests_count = 0;
 let currentPage = 1;
-let pageLimit = 20;
+let pageLimit = 100;
 let loadingPage = false;
 
 // ---------------- Theme management ----------------
@@ -279,7 +279,7 @@ function updateStats() {
         : '0.00';
     document.getElementById('avg-time').textContent = avgTime + 'ms';
 
-    updateCharts();
+    updateCharts(); 
 }
 
 
