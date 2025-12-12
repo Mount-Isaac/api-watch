@@ -550,7 +550,7 @@ body.light-mode .theme-toggle-slider {
     justify-content: center;
     align-items: center;
     gap: 12px;
-    margin: 20px 0;
+    margin: -40px 0px 50px 0px;
 }
 
 .pagination .btn {
