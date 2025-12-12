@@ -33,7 +33,7 @@ class DashboardServer:
         self.ws_clients = set()
         self.app = None
         self.runner = None
-        db_path = Path(__file__).parent.parent / 'utils' / 'data' / 'apiwatch.db'
+        db_path = Path(__file__).parent.parent / 'data' / 'apiwatch.db'
         self.db = AsyncDB(db_path)
     
     async def websocket_handler(self, request):
@@ -44,11 +44,11 @@ class DashboardServer:
         self.ws_clients.add(ws)
         
         # Send history on connect
-        if self.history:
-            await ws.send_str(json.dumps({
-                "type": "history", 
-                "data": await self.db.get_all_logs()
-            }))
+        # if self.history:
+        #     await ws.send_str(json.dumps({
+        #         "type": "history", 
+        #         "data": await self.db.get_all_logs()
+        #     }))
         
         try:
             async for msg in ws:
@@ -84,9 +84,10 @@ class DashboardServer:
             
             # Store in history
             self.history.append(data)
-            await self.db.insert_log(**data)
+            total_count = await self.db.insert_log(**data)
             
             # Broadcast to all browser WebSocket clients
+            data.update({ 'total': total_count })
             if self.ws_clients:
                 message = json.dumps(data)
                 dead_clients = set()
@@ -104,9 +105,15 @@ class DashboardServer:
             return web.json_response({'status': 'error', 'message': str(e)}, status=500)
     
     async def api_history_handler(self, request):
-        """Get all request history"""
-        all_data = await self.db.get_all_logs()
-        return web.json_response(all_data)
+        page = int(request.query.get("page", 1))
+        limit = int(request.query.get("limit", 20))
+
+        logs = await self.db.get_logs_paginated(page, limit)
+        return web.json_response({
+            "page": page,
+            "limit": limit,
+            "data": logs
+        })
     
     async def api_clear_handler(self, request):
         """Clear history"""

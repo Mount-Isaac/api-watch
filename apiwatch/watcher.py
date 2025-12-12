@@ -81,8 +81,6 @@ class ApiWatcher:
 
                     # send data to the db
                     self.history.append(data)
-                    print(data)
-                    await self.db.insert_log(**data)
 
                     # Send to dashboard via HTTP POST
                     await self._send_to_dashboard(data)

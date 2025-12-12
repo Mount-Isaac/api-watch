@@ -8,7 +8,7 @@ class AsyncDB:
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
             # Default path: ../utils/data/apiwatch.db
-            db_path = Path(__file__).parent.parent / 'utils' / 'data' / 'apiwatch.db'
+            db_path = Path(__file__).parent.parent / 'data' / 'apiwatch.db'
         self.db_path = str(db_path)
         self._initialized = False
 
@@ -60,6 +60,12 @@ class AsyncDB:
             await db.execute(sql, values)
             await db.commit()
 
+            # now get total count
+            cur = await db.execute("SELECT COUNT(*) FROM api_logs")
+            row = await cur.fetchone()
+
+        return row[0]   # total logs
+
     async def get_all_logs(self) -> List[Dict]:
         """Fetch all logs and deserialize JSON fields"""
         dict_fields = ['headers', 'query_params', 'request_data', 'response_data']
@@ -85,3 +91,46 @@ class AsyncDB:
             await db.execute('DELETE FROM api_logs')
             await db.commit()
         return []
+
+    async def get_logs_paginated(self, page=1, limit=20):
+        offset = (page - 1) * limit
+
+        query = """
+            SELECT
+                *,
+                COUNT(*) OVER() AS total_count
+            FROM api_logs
+            ORDER BY timestamp DESC
+            LIMIT ? OFFSET ?
+        """
+
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(query, (limit, offset))
+            rows = await cursor.fetchall()
+
+        results = []
+        total_logs = 0
+
+        for row in rows:
+            item = dict(row)
+
+            # Extract total count once
+            total_logs = item.pop("total_count", total_logs)
+
+            # Convert TEXT fields back to dict
+            for field in ("headers", "query_params", "request_data", "response_data"):
+                if item.get(field):
+                    try:
+                        item[field] = json.loads(item[field])
+                    except:
+                        pass
+
+            results.append(item)
+
+        return {
+            "total": total_logs,
+            "page": page,
+            "limit": limit,
+            "results": results
+        }
