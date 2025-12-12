@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>api-watch - Live Monitor</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <!-- Login Page -->
+    <div id="login-page" class="login-container">
+      <div class="login-box">
+        <h2>api-watch</h2>
+        <form id="login-form" onsubmit="login(event)">
+          <input
+            type="text"
+            id="username"
+            class="login-input"
+            placeholder="Username"
+            required
+            autocomplete="username"
+          />
+          <input
+            type="password"
+            id="password"
+            class="login-input"
+            placeholder="Password"
+            required
+            autocomplete="current-password"
+          />
+          <button type="submit" class="login-btn" id="login-btn">Login</button>
+        </form>
+        <div id="login-error" class="error hidden">Invalid credentials</div>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="hidden">
+      <div class="header">
+        <div class="header-left">
+          <h1>api-watch</h1>
+          <div class="status">
+            <div class="status-dot"></div>
+            <span>Live</span>
+            <span>|</span>
+            <span id="request-count">0 requests</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="theme-toggle" onclick="toggleTheme()">
+            <div class="theme-toggle-slider"></div>
+          </div>
+          <button class="btn" onclick="clearRequests()">Clear</button>
+          <button class="btn" onclick="logout()">Logout</button>
+        </div>
+      </div>
+
+      <div class="container">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Requests</div>
+            <div class="stat-value" id="total-requests">0</div>
+            <div class="stat-chart" id="chart-total"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Success Rate</div>
+            <div class="stat-value" id="success-rate">100%</div>
+            <div class="stat-chart" id="chart-success"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Avg Response Time</div>
+            <div class="stat-value" id="avg-time">0ms</div>
+            <div class="stat-chart" id="chart-time"></div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <div class="control-group">
+            <span class="control-label">Status:</span>
+            <select class="select" id="filter-status" onchange="applyFilters()">
+              <option value="all">All</option>
+              <option value="2xx">2xx Success</option>
+              <option value="3xx">3xx Redirect</option>
+              <option value="4xx">4xx Client Error</option>
+              <option value="5xx">5xx Server Error</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Method:</span>
+            <select class="select" id="filter-method" onchange="applyFilters()">
+              <option value="all">All</option>
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+              <option value="PUT">PUT</option>
+              <option value="DELETE">DELETE</option>
+              <option value="PATCH">PATCH</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Sort By:</span>
+            <select class="select" id="sort-by" onchange="applySort()">
+              <option value="time-desc">Newest First</option>
+              <option value="time-asc">Oldest First</option>
+              <option value="duration-desc">Slowest First</option>
+              <option value="duration-asc">Fastest First</option>
+              <option value="status-asc">Status (Low to High)</option>
+              <option value="status-desc">Status (High to Low)</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="requests"></div>
+        <div id="empty-state" class="empty-state">
+          <p>Waiting for API requests...</p>
+          <div class="loading-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <span>&copy; Isaac Kyalo</span> |
+        <a
+          class="link"
+          href="https://github.com/mount-isaac/api-watch"
+          target="_blank"
+          >GitHub</a
+        >
+      </div>
+    </div>
+
+    <script src="/static/scripts.js"></script>
+  </body>
+</html>

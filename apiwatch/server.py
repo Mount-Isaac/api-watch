@@ -1,14 +1,18 @@
 """
 Smart server that auto-starts dashboard if needed
-Works like RabbitMQ - checks if dashboard is running, starts if not
+Checks if dashboard is running, starts if not
 """
-import asyncio
 import json
-import socket
-import threading
 import os
+from pathlib import Path
+import threading
+import asyncio
+import socket
 from aiohttp import web
 from collections import deque
+from .ui import template
+from utils.db_sqlite import AsyncDB
+
 
 
 # Global state
@@ -25,10 +29,12 @@ class DashboardServer:
         self.max_history = max_history
         self.username=username
         self.password=password
-        self.history = deque(maxlen=max_history)
+        self.history = []
         self.ws_clients = set()
         self.app = None
         self.runner = None
+        db_path = Path(__file__).parent.parent / 'utils' / 'data' / 'apiwatch.db'
+        self.db = AsyncDB(db_path)
     
     async def websocket_handler(self, request):
         """Handle WebSocket connections from browsers"""
@@ -41,7 +47,7 @@ class DashboardServer:
         if self.history:
             await ws.send_str(json.dumps({
                 "type": "history", 
-                "data": list(self.history)
+                "data": await self.db.get_all_logs()
             }))
         
         try:
@@ -55,20 +61,21 @@ class DashboardServer:
     
     async def dashboard_handler(self, request):
         """Serve the dashboard HTML"""
-        from .template_ui import template
+        # html = template.replace('REPLACE_USERNAME', self.username)
+        # html = html.replace('REPLACE_PASSWORD', self.password)
 
-        html = template.replace('REPLACE_USERNAME', self.username)
-        html = html.replace('REPLACE_PASSWORD', self.password)
-
-        return web.Response(text=template, content_type='text/html')
+        return web.Response(text=template(), content_type='text/html')
     
-    async def get_auth_credentials(self, *args):
-        credentials = {
-            'username':self.username,
-            'password': self.password
-        }
+    async def get_auth_credentials(self, request, **kwargs):
+        data = await request.json()
+
+        is_match = (
+            data.get('username') == self.username and 
+            data.get('password') == self.password
+        )
+        auth_response = { 'message': 'success' } if is_match else { 'message': 'Invalid credentials.' }
         
-        return web.json_response(credentials)
+        return web.json_response(auth_response)
     
     async def api_publish_handler(self, request):
         """Receive request data from microservices and broadcast to browsers"""
@@ -77,6 +84,7 @@ class DashboardServer:
             
             # Store in history
             self.history.append(data)
+            await self.db.insert_log(**data)
             
             # Broadcast to all browser WebSocket clients
             if self.ws_clients:
@@ -97,19 +105,26 @@ class DashboardServer:
     
     async def api_history_handler(self, request):
         """Get all request history"""
-        return web.json_response(list(self.history))
+        all_data = await self.db.get_all_logs()
+        return web.json_response(all_data)
     
     async def api_clear_handler(self, request):
         """Clear history"""
-        self.history.clear()
+        self.history = await self.db.delete_all_logs()
         return web.json_response({"status": "cleared"})
     
     async def start(self):
         """Start the dashboard server"""
         self.app = web.Application()
+        await self.db.init()
+        self.history = await self.db.get_all_logs()
+
+        BASE_DIR = Path(__file__).parent / 'ui'
+        self.app.router.add_static('/static', path=BASE_DIR, name='static')
+        print(f'base dir:{BASE_DIR}')
         self.app.router.add_get('/', self.dashboard_handler)
         self.app.router.add_get('/ws', self.websocket_handler)
-        self.app.router.add_get('/auth', self.get_auth_credentials)
+        self.app.router.add_post('/auth', self.get_auth_credentials)
         self.app.router.add_post('/api/publish', self.api_publish_handler)
         self.app.router.add_get('/api/history', self.api_history_handler)
         self.app.router.add_post('/api/clear', self.api_clear_handler)

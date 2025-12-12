@@ -51,7 +51,7 @@ class DashboardServer:
     
     async def dashboard_handler(self, request):
         """Serve the dashboard HTML"""
-        from .template_ui import template
+        from .ui.template_ui import template
         return web.Response(text=template, content_type='text/html')
     
     async def api_publish_handler(self, request):
@@ -63,6 +63,7 @@ class DashboardServer:
             
             # Store in history
             self.history.append(data)
+            print(data)
             
             # Broadcast to all browser WebSocket clients
             if self.ws_clients:

@@ -1,0 +1,1 @@
+from .template_ui import get_template_html as template
