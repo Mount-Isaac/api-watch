@@ -17,7 +17,7 @@ let stats = {
 };
 let all_requests_count = 0;
 let currentPage = 1;
-let pageLimit = 100;
+let pageLimit = 20;
 let loadingPage = false;
 
 // ---------------- Theme management ----------------
@@ -131,7 +131,9 @@ async function fetchPage(page) {
     all_requests_count = result.data.total;
     allRequests = result.data.results;
 
-    updateStats();
+    // Recalculate stats from allRequests
+    recalcStats();
+
     renderRequests(allRequests);
     document.getElementById("page-num").textContent = currentPage;
 
@@ -156,7 +158,7 @@ function addRequest(req, skipRender = false) {
     allRequests.unshift(req);
     all_requests_count++;
 
-    // Update stats
+    // Update stats incrementally
     stats.total++;
     const statusCode = parseInt(req.status_code);
     if (statusCode >= 200 && statusCode < 400) stats.success++;
@@ -175,14 +177,21 @@ function addRequest(req, skipRender = false) {
     if (!skipRender) renderNewRequest(req);
 }
 
+function recalcStats() {
+    stats.total = allRequests.length;
+    stats.success = allRequests.filter(r => parseInt(r.status_code) >= 200 && parseInt(r.status_code) < 400).length;
+    stats.error = stats.total - stats.success;
+    stats.durations = allRequests.filter(r => r.duration_ms).map(r => r.duration_ms);
+    stats.history = allRequests.slice(-20).map(r => ({ time: new Date(r.timestamp).getTime(), success: parseInt(r.status_code) < 400 }));
+    updateStats();
+}
+
 function renderNewRequest(req) {
     const sortBy = document.getElementById('sort-by').value;
-
     if (sortBy !== 'time-desc') {
         applyFilters();
         return;
     }
-
     requestsEl.insertAdjacentHTML('afterbegin', renderRequest(req));
 }
 
@@ -212,7 +221,6 @@ function renderRequest(req) {
 function toggleDetails(header) {
     const id = header.parentElement.dataset.id;
     const details = header.nextElementSibling;
-
     details.classList.toggle('open');
     if (details.classList.contains('open')) expandedSet.add(id);
     else expandedSet.delete(id);
@@ -263,14 +271,17 @@ function updateStats() {
     countEl.textContent = `${all_requests_count} request${all_requests_count !== 1 ? 's' : ''}`;
     document.getElementById('total-requests').textContent = all_requests_count;
 
-    const successRate = stats.total > 0 ? Math.round((stats.success / stats.total) * 100) : 100;
+    const successRate = stats.total > 0 ? Math.round((stats.success / stats.total) * 100) : 0;
     document.getElementById('success-rate').textContent = successRate + '%';
 
-    const avgTime = stats.durations.length > 0 ? Math.round(stats.durations.reduce((a, b) => a + b, 0) / stats.durations.length) : 0;
+    const avgTime = stats.durations.length > 0 
+        ? (stats.durations.reduce((a, b) => a + b, 0) / stats.durations.length).toFixed(2)
+        : '0.00';
     document.getElementById('avg-time').textContent = avgTime + 'ms';
 
     updateCharts();
 }
+
 
 function updateCharts() {
     const chartTotal = document.getElementById('chart-total');

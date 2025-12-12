@@ -2,4 +2,4 @@ include README.md
 include LICENSE
 include requirements.txt 
 recursive-include apiwatch *.py
-prune tests
+prune tests data dist

@@ -17,7 +17,6 @@ class ApiWatcher:
 
     def __init__(self, 
         service_name='main-app', 
-        max_history:int=1000, 
         dashboard_host:str='localhost', 
         dashboard_port:int=22222,
         dashboard_username:str='admin',
@@ -35,11 +34,10 @@ class ApiWatcher:
             auto_start_dashboard: Auto-start dashboard if not running (default: True)
         """
         self.service_name = service_name
-        self.max_history = max_history
         self.dashboard_host = dashboard_host
         self.dashboard_port = dashboard_port
         self.request_queue = Queue()
-        self.history = deque(maxlen=max_history)
+        self.history = deque()
         self.loop = None
         self.worker_thread = None
         self._running = False

@@ -40,7 +40,7 @@ def hello():
     return jsonify({
         "message": f"Hello {data.get('name', 'World')}!",
         "service": "flask-service"
-    })
+    }), 409
 
 
 if __name__ == '__main__':

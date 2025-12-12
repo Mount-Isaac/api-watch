@@ -8,21 +8,22 @@ import asyncio
 import json
 from aiohttp import web
 from collections import deque
+from utils.db_sqlite import AsyncDB
 
 
 class DashboardServer:
     """Centralized dashboard server - runs as separate process"""
     
-    def __init__(self, host='0.0.0.0', port=22222, max_history=1000, username='admin', password='admin'):
+    def __init__(self, host='0.0.0.0', port=22222, username='admin', password='admin'):
         self.host = host
         self.port = port
-        self.max_history = max_history
-        self.history = deque(maxlen=max_history)
+        self.history = deque()
         self.ws_clients = set()
         self.app = None
         self.runner = None
         self.username=username
         self.password=password
+        self.db = AsyncDB
     
     async def websocket_handler(self, request):
         """Handle WebSocket connections from browsers"""

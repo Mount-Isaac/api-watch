@@ -1,8 +1,6 @@
 Next Release: Version 0.1.5
+
 1. Persistent data storage
-    - Redis
-    - RabbitMQ
-    - Redis
-    - Kafka
+   - sqlite3
 2. FastAPI capture & log response data
-    - currently prints request data & headers
+   - currently prints request data & headers

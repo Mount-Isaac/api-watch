@@ -32,16 +32,19 @@ A lightweight, developer-focused tool that streams your API requests, responses,
 ### Installation
 
 **For Flask:**
+
 ```bash
 pip install api-watch[flask]
 ```
 
 **For FastAPI:**
+
 ```bash
 pip install api-watch[fastapi]
 ```
 
 **For both:**
+
 ```bash
 pip install api-watch[all]
 ```
@@ -71,17 +74,20 @@ if __name__ == '__main__':
 ```
 
 **Terminal run:**
+
 ```bash
 python -m apiwatch
 ```
 
 **Docker run: easiest**
+
 ```bash
 docker pull theisaac/api-watch:latest
-docker compose up -d 
+docker compose up -d
 ```
 
 **Open dashboard:**
+
 ```
 http://localhost:22222
 ```
@@ -119,6 +125,7 @@ if __name__ == '__main__':
 ```
 
 **Run it:**
+
 ```bash
 uvicorn app:app --port 8000
 ```
@@ -128,44 +135,25 @@ uvicorn app:app --port 8000
 ## 📊 Dashboard Features
 
 ### Real-time Request Monitoring
-- ✅ Live streaming of API requests
-- ✅ Color-coded HTTP methods (GET, POST, PUT, DELETE)
-- ✅ Status code highlighting (success/error)
-- ✅ Response time tracking
-- ✅ Service name badges (multi-service support)
+
+- Live streaming of API requests
+- Color-coded HTTP methods (GET, POST, PUT, DELETE)
+- Status code highlighting (success/error)
+- Response time tracking
+- Service name badges (multi-service support)
 
 ### Filters & Search
+
 - Filter by status code (2xx, 3xx, 4xx, 5xx, All)
 - Sort by newest, oldest, fastest, sloweset, status(high-low)
 - Filter by HTTP method
 
 ### Request Details
+
 - Full request/response bodies
 - Query parameters
 - Headers (sensitive headers filtered)
 - Timestamp and duration
-
----
-
-## Use Cases
-
-### Development & Debugging
-```python
-# See exactly what's hitting your API in real-time
-# No more print() debugging!
-```
-
-### API Testing
-```python
-# Watch your integration tests run
-# Verify request/response data instantly
-```
-
-### Microservices Monitoring
-```python
-# Monitor traffic between multiple services
-# Debug complex request flows
-```
 
 ---
 
@@ -186,9 +174,10 @@ api_watcher = ApiWatcher(
 ### Middleware Options
 
 **Flask:**
+
 ```python
 FlaskWatchMiddleware(
-    app, 
+    app,
     api_watcher,
     capture_request_body=True,   # Log request bodies
     capture_response_body=True   # Log response bodies
@@ -196,6 +185,7 @@ FlaskWatchMiddleware(
 ```
 
 **FastAPI:**
+
 ```python
 app.add_middleware(
     FastAPIWatchMiddleware,
@@ -214,11 +204,13 @@ app.add_middleware(
 For production, run the dashboard as a separate service:
 
 **Terminal 1: Start Dashboard**
+
 ```bash
 python -m apiwatch
 ```
 
 **Terminal 2: Start Your App**
+
 ```python
 from apiwatch import ApiWatcher
 
@@ -235,8 +227,8 @@ services:
   apiwatch:
     image: theisaac/api-watch:latest
     container_name: apiwatch
-    networks: 
-     - test-network
+    networks:
+      - test-network
     ports:
       - "22222:22222"
     restart: unless-stopped
@@ -247,10 +239,9 @@ services:
       - API_WATCH_DASHBOARD_HOST=0.0.0.
       - API_WATCH_DASHBOARD_PORT=22222
     command: python -m apiwatch
-
 ```
 
-```yaml
+````yaml
 services:
   test_flask_app:
     image: theisaac/files-webapp:latest
@@ -261,12 +252,12 @@ services:
       - API_WATCH_MAX_HISTORY=3000
       - API_WATCH_DASHBOARD_HOST=apiwatch
       - API_WATCH_DASHBOARD_PORT=22222
-      - API_WATCH_AUTO_START=false 
+      - API_WATCH_AUTO_START=false
     ports:
       - 1515:1515
 
 #### NOTE
-In Dockerized applications, ensure that the **apiwatch** container and your **Flask/FastAPI** containers are on the same network.  
+In Dockerized applications, ensure that the **apiwatch** container and your **Flask/FastAPI** containers are on the same network.
 Also, use the container name `apiwatch` as the host name in your Flask app.
 
 
@@ -281,7 +272,7 @@ api_watcher = ApiWatcher(
     dashboard_port=int(os.getenv('WATCHDOG_PORT', 22222)),
     auto_start_dashboard=False
 )
-```
+````
 
 ---
 
