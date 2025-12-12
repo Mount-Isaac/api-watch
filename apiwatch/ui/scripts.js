@@ -5,6 +5,7 @@ const requestsEl = document.getElementById('requests');
 const emptyStateEl = document.getElementById('empty-state');
 const countEl = document.getElementById('request-count');
 
+let expandedSet = new Set();
 let allRequests = [];
 let ws;
 let stats = {
@@ -107,6 +108,34 @@ function initWebSocket() {
     ws.onclose = () => console.log('WebSocket disconnected');
 }
 
+function renderNewRequest(req) {
+    console.log(`new request: ${req}`)
+    const sortBy = document.getElementById('sort-by').value;
+
+    // We only add new request to DOM if sorting is "time-desc"
+    // Otherwise applyFilters() (rare)
+    if (sortBy !== 'time-desc') {
+        applyFilters();
+        return;
+    }
+
+    // Insert at the top WITHOUT clearing previous requests
+    requestsEl.insertAdjacentHTML('afterbegin', renderRequest(req));
+}
+
+function toggleDetails(header) {
+    const id = header.parentElement.dataset.id;
+    const details = header.nextElementSibling;
+
+    details.classList.toggle('open');
+
+    if (details.classList.contains('open')) {
+        expandedSet.add(id);
+    } else {
+        expandedSet.delete(id);
+    }
+}
+
 function addRequest(req, skipRender = false) {
     emptyStateEl.style.display = 'none';
     
@@ -136,7 +165,8 @@ function addRequest(req, skipRender = false) {
     updateStats();
     
     if (!skipRender) {
-        applyFilters();
+        renderNewRequest(req)
+        // applyFilters();
     }
 }
 
@@ -194,7 +224,8 @@ function renderRequest(req) {
                 <span class="duration">${req.duration_ms ? req.duration_ms + 'ms' : '---'}</span>
                 <span class="timestamp">${new Date(req.timestamp).toLocaleTimeString()} UTC</span>
             </div>
-            <div class="request-details">
+
+            <div class="request-details ${expandedSet.has(req.id) ? 'open' : ''}">
                 ${req.query_params && Object.keys(req.query_params).length ? `
                     <div class="detail-section">
                         <div class="detail-label">Query Parameters</div>

@@ -33,7 +33,7 @@ class DashboardServer:
         self.ws_clients = set()
         self.app = None
         self.runner = None
-        db_path = Path(__file__).parent.parent / 'utils' / 'data' / 'apiwatch.db'
+        db_path = Path(__file__).parent.parent / 'data' / 'apiwatch.db'
         self.db = AsyncDB(db_path)
     
     async def websocket_handler(self, request):

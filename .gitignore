@@ -66,3 +66,6 @@ Thumbs.db
 # Project specific
 *.log
 .env
+
+# data
+data/

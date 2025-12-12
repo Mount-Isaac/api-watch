@@ -8,7 +8,7 @@ class AsyncDB:
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
             # Default path: ../utils/data/apiwatch.db
-            db_path = Path(__file__).parent.parent / 'utils' / 'data' / 'apiwatch.db'
+            db_path = Path(__file__).parent.parent / 'data' / 'apiwatch.db'
         self.db_path = str(db_path)
         self._initialized = False
 
