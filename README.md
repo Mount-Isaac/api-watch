@@ -164,7 +164,6 @@ uvicorn app:app --port 8000
 ```python
 api_watcher = ApiWatcher(
     service_name='my-app',           # Service identifier
-    max_history=1000,                # Requests to keep in memory
     dashboard_host='localhost',      # Dashboard host
     dashboard_port=22222,            # Dashboard port
     auto_start_dashboard=True        # Auto-start if not running
