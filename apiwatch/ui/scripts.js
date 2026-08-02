@@ -1,3 +1,5 @@
+console.log('[apiwatch] scripts.js loaded, build: v3-redesign');
+
 const DASHBOARD = document.getElementById('dashboard');
 const LOGIN_PAGE = document.getElementById('login-page');
 const ERROR_EL = document.getElementById('login-error');
@@ -5,9 +7,18 @@ const requestsEl = document.getElementById('requests');
 const emptyStateEl = document.getElementById('empty-state');
 const countEl = document.getElementById('request-count');
 const containerFilterEl = document.getElementById('filter-container');
+const searchInputEl = document.getElementById('search-input');
+const statusDotEl = document.getElementById('status-dot');
+const liveTailBtnEl = document.getElementById('live-tail-btn');
+const liveTailLabelEl = document.getElementById('live-tail-label');
 
 const LEVEL_RANK = { CRITICAL: 0, ERROR: 1, WARNING: 2, INFO: 3, DEBUG: 4, UNKNOWN: 5 };
 const ERROR_LEVELS = new Set(['CRITICAL', 'ERROR']);
+const ALL_LEVELS = ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'UNKNOWN'];
+// not an arithmetic range (10/20/30/50/100 has no constant step), so this
+// stays an explicit list - but it's the one place it's defined, and the
+// <select> is built from it instead of duplicating these values in HTML
+const PAGE_SIZES = [10, 20, 30, 50, 100];
 
 let expandedSet = new Set();
 let allRequests = [];
@@ -20,8 +31,32 @@ let stats = {
 let knownContainers = new Set();
 let all_requests_count = 0;
 let currentPage = 1;
-let pageLimit = 100;
+// rows-per-page: also doubles as the cap on the live-stream buffer (see
+// addRequest), so changing it affects both the paginated fetch size and
+// how many live rows are kept in memory before the oldest rolls off
+let pageLimit = parseInt(localStorage.getItem('pageLimit'), 10) || 100;
 let loadingPage = false;
+
+function changePageSize() {
+    const pageSizeEl = document.getElementById('page-size');
+    pageLimit = parseInt(pageSizeEl.value, 10) || 100;
+    localStorage.setItem('pageLimit', pageLimit);
+    // trim what's already in memory too, so a live buffer that was built
+    // up at the old size doesn't stay oversized until the next log arrives
+    if (allRequests.length > pageLimit) {
+        allRequests.length = pageLimit;
+    }
+    fetchPage(1);
+}
+
+// live-tail state: when paused, incoming ws messages are still recorded
+// (stats stay accurate) but not rendered until the user resumes, so a
+// busy stream doesn't yank a row they're mid-read on out from under them
+let isLive = true;
+let pendingNewCount = 0;
+
+// active level filter set - multi-select chips, defaults to everything on
+let activeLevels = new Set(ALL_LEVELS);
 
 // ---------------- Theme management ----------------
 function toggleTheme() {
@@ -120,6 +155,9 @@ async function logout() {
     all_requests_count = 0;
     stats = { total: 0, errors: 0, history: [] };
     knownContainers = new Set();
+    pendingNewCount = 0;
+    isLive = true;
+    updateLiveTailUI();
 
     countEl.textContent = `${all_requests_count} logs`;
     document.getElementById('total-requests').textContent = all_requests_count;
@@ -168,6 +206,40 @@ function scheduleReconnect() {
             initWebSocket();
         }
     }, delay);
+}
+
+// ---------------- Live tail ----------------
+function toggleLiveTail() {
+    isLive = !isLive;
+    if (isLive) {
+        pendingNewCount = 0;
+        applyFilters();
+    }
+    updateLiveTailUI();
+}
+
+function updateLiveTailUI() {
+    if (!liveTailBtnEl) return;
+    if (isLive) {
+        liveTailBtnEl.classList.remove('paused');
+        liveTailLabelEl.textContent = 'Live';
+    } else {
+        liveTailBtnEl.classList.add('paused');
+        liveTailLabelEl.textContent = pendingNewCount > 0 ? `Paused (+${pendingNewCount})` : 'Paused';
+    }
+}
+
+// ---------------- Container color coding ----------------
+// deterministic hash -> hue, so the same container name always gets the
+// same swatch color across reloads and across every logged-in user
+function containerColor(name) {
+    if (!name) return 'transparent';
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+    }
+    const hue = hash % 360;
+    return `hsl(${hue}, 60%, 55%)`;
 }
 
 // ---------------- Containers filter ----------------
@@ -223,7 +295,7 @@ async function fetchPage(page) {
     allRequests.forEach(r => noteContainer(r.container_name));
     recalcStats();
 
-    renderRequests(allRequests);
+    applyFilters();
     document.getElementById("page-num").textContent = currentPage;
 
     loadingPage = false;
@@ -239,8 +311,129 @@ function prevPage() {
     }
 }
 
+// ---------------- JSON tree rendering ----------------
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+// IMPORTANT: .json-line has `white-space: pre-wrap` in the CSS so long
+// values wrap instead of overflowing. That means any newline/indentation
+// embedded in the HTML string we build here gets rendered literally by the
+// browser. Every string returned for a single .json-line MUST therefore be
+// built as one unbroken line with no template-literal line breaks inside it.
+// Only the .json-children wrapper (indentation via margin-left) should ever
+// introduce structural nesting/whitespace.
+function renderJsonNode(value, keyLabel, depth) {
+    const keyHtml = keyLabel !== null
+        ? `<span class="json-key">"${escapeHtml(keyLabel)}"</span>: `
+        : '';
+
+    if (value === null) {
+        return `<div class="json-line">${keyHtml}<span class="json-null">null</span></div>`;
+    }
+    if (typeof value === 'boolean') {
+        return `<div class="json-line">${keyHtml}<span class="json-bool">${value}</span></div>`;
+    }
+    if (typeof value === 'number') {
+        return `<div class="json-line">${keyHtml}<span class="json-number">${value}</span></div>`;
+    }
+    if (typeof value === 'string') {
+        return `<div class="json-line">${keyHtml}<span class="json-string">"${escapeHtml(value)}"</span></div>`;
+    }
+
+    const isArray = Array.isArray(value);
+    const entries = isArray ? value.map((v, i) => [i, v]) : Object.entries(value);
+
+    if (entries.length === 0) {
+        return `<div class="json-line">${keyHtml}<span class="json-bracket">${isArray ? '[]' : '{}'}</span></div>`;
+    }
+
+    const childrenHtml = entries
+        .map(([k, v]) => renderJsonNode(v, isArray ? null : k, depth + 1))
+        .join('');
+
+    const openLine = `<div class="json-line"><span class="json-toggle" onclick="toggleJsonNode(this)">\u25BE</span>${keyHtml}<span class="json-bracket">${isArray ? '[' : '{'}</span><span class="json-count">${entries.length} item${entries.length !== 1 ? 's' : ''}</span></div>`;
+    const closeLine = `<div class="json-line json-close"><span class="json-bracket">${isArray ? ']' : '}'}</span></div>`;
+
+    return `<div class="json-node">${openLine}<div class="json-children">${childrenHtml}</div>${closeLine}</div>`;
+}
+
+function toggleJsonNode(toggleEl) {
+    const node = toggleEl.closest('.json-node');
+    if (!node) {
+        console.error('toggleJsonNode: no .json-node ancestor found for', toggleEl);
+        return;
+    }
+
+    let children = null;
+    for (const child of node.children) {
+        if (child.classList && child.classList.contains('json-children')) {
+            children = child;
+            break;
+        }
+    }
+
+    if (!children) {
+        console.error('toggleJsonNode: no direct .json-children found inside', node);
+        return;
+    }
+
+    const isCollapsed = children.classList.toggle('collapsed');
+    toggleEl.textContent = isCollapsed ? '\u25B8' : '\u25BE';
+}
+
+function renderDetailContent(text) {
+    if (!text) return '';
+    try {
+        const parsed = JSON.parse(text);
+        if (parsed !== null && typeof parsed === 'object') {
+            return `<div class="json-tree">${renderJsonNode(parsed, null, 0)}</div>`;
+        }
+    } catch (e) {
+        // not JSON, fall through to plain text
+    }
+    return `<pre>${escapeHtml(text)}</pre>`;
+}
+
+function findRequestById(id) {
+    return allRequests.find(r => String(r.id) === String(id));
+}
+
+async function copyDetailField(id, field, btnEl) {
+    const req = findRequestById(id);
+    if (!req || !req[field]) return;
+
+    let toCopy = req[field];
+    try {
+        const parsed = JSON.parse(toCopy);
+        if (parsed !== null && typeof parsed === 'object') {
+            // copy the indented version, not the single-line raw string,
+            // that's what's actually useful to paste elsewhere
+            toCopy = JSON.stringify(parsed, null, 2);
+        }
+    } catch (e) {
+        // not JSON, copy as-is
+    }
+
+    try {
+        await navigator.clipboard.writeText(toCopy);
+        const original = btnEl.textContent;
+        btnEl.textContent = 'Copied';
+        btnEl.classList.add('copied');
+        setTimeout(() => {
+            btnEl.textContent = original;
+            btnEl.classList.remove('copied');
+        }, 1500);
+    } catch (err) {
+        console.log('copy failed, likely no clipboard access (needs https or localhost)', err);
+    }
+}
+
 // ---------------- Requests handling ----------------
-function addRequest(req, skipRender = false) {
+function addRequest(req) {
     emptyStateEl.style.display = 'none';
 
     req.id = Date.now() + Math.random();
@@ -248,15 +441,52 @@ function addRequest(req, skipRender = false) {
     all_requests_count++;
     noteContainer(req.container_name);
 
-    stats.total++;
-    if (ERROR_LEVELS.has(req.level)) stats.errors++;
+    // keep the client-side cache capped to one page's worth while logs
+    // stream in live. Without this, allRequests grows unbounded past
+    // pageLimit and page 1 silently shows more than 100 rows until a
+    // refresh resets it. The row that rolls off here isn't lost — it's
+    // still on the server, reachable by paging forward with Next.
+    let overflowed = false;
+    if (allRequests.length > pageLimit) {
+        allRequests.length = pageLimit;
+        overflowed = true;
+    }
 
-    stats.history.push({ time: Date.now(), isError: ERROR_LEVELS.has(req.level) });
+    const isError = ERROR_LEVELS.has(req.level);
+    stats.total++;
+    if (isError) stats.errors++;
+
+    stats.history.push({ time: Date.now(), isError });
     if (stats.history.length > 20) stats.history.shift();
 
     updateStats();
+    updateBeacon(isError);
 
-    if (!skipRender) renderNewRequest(req);
+    if (isLive) {
+        if (overflowed) {
+            // an existing row dropped off the bottom of the page, so the
+            // cheap "just prepend one row" path is no longer accurate -
+            // re-render fully from the (now-capped) array instead
+            applyFilters();
+        } else {
+            renderNewRequest(req);
+        }
+    } else {
+        pendingNewCount++;
+        updateLiveTailUI();
+    }
+}
+
+// beacon briefly flips to alert red when an error just came through, so
+// the header status dot means something instead of just pulsing forever
+let beaconResetTimer = null;
+function updateBeacon(isError) {
+    if (!statusDotEl) return;
+    if (isError) {
+        statusDotEl.classList.add('alert');
+        if (beaconResetTimer) clearTimeout(beaconResetTimer);
+        beaconResetTimer = setTimeout(() => statusDotEl.classList.remove('alert'), 4000);
+    }
 }
 
 function recalcStats() {
@@ -271,32 +501,44 @@ function recalcStats() {
 
 function renderNewRequest(req) {
     const sortBy = document.getElementById('sort-by').value;
-    if (sortBy !== 'time-desc') {
+    if (sortBy !== 'time-desc' || !passesFilters(req)) {
         applyFilters();
         return;
     }
     requestsEl.insertAdjacentHTML('afterbegin', renderRequest(req));
 }
 
+// wraps every case-insensitive occurrence of the search term in <mark>,
+// escaping first so we never inject the raw (unescaped) search text
+function highlightMatch(text, term) {
+    const escaped = escapeHtml(text);
+    if (!term) return escaped;
+    const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return escaped.replace(new RegExp(`(${escapedTerm})`, 'ig'), '<mark>$1</mark>');
+}
+
 function renderRequest(req) {
     const level = req.level || 'UNKNOWN';
+    const term = searchInputEl ? searchInputEl.value.trim() : '';
+    const messageRaw = req.message || req.raw || '';
+    const dotColor = containerColor(req.container_name);
     const containerBadge = req.container_name
-        ? `<span class="service-badge">${req.container_name}</span>`
+        ? `<span class="service-badge"><span class="container-dot" style="background:${dotColor}"></span>${escapeHtml(req.container_name)}</span>`
         : '';
     const timestamp = req.timestamp ? new Date(req.timestamp) : null;
     const timeLabel = timestamp && !isNaN(timestamp) ? timestamp.toLocaleTimeString() : '---';
 
     return `
-        <div class="request-item" data-id="${req.id}">
+        <div class="request-item" data-id="${req.id}" data-level="${level}">
             <div class="request-header" onclick="toggleDetails(this)">
                 ${containerBadge}
                 <span class="level level-${level}">${level}</span>
-                <span class="message">${req.message || req.raw || ''}</span>
+                <span class="message">${highlightMatch(messageRaw, term)}</span>
                 <span class="timestamp">${timeLabel}</span>
             </div>
             <div class="request-details ${expandedSet.has(req.id) ? 'open' : ''}">
-                ${req.logger ? `<div class="detail-section"><div class="detail-label">Logger</div><div class="detail-content"><pre>${req.logger}</pre></div></div>` : ''}
-                ${req.raw ? `<div class="detail-section"><div class="detail-label">Raw Line</div><div class="detail-content"><pre>${req.raw}</pre></div></div>` : ''}
+                ${req.logger ? `<div class="detail-section"><div class="detail-label-row"><span class="detail-label">Logger</span><button class="copy-btn" onclick="copyDetailField('${req.id}', 'logger', this)">Copy</button></div><div class="detail-content"><pre>${escapeHtml(req.logger)}</pre></div></div>` : ''}
+                ${req.raw ? `<div class="detail-section"><div class="detail-label-row"><span class="detail-label">Raw Line</span><button class="copy-btn" onclick="copyDetailField('${req.id}', 'raw', this)">Copy</button></div><div class="detail-content">${renderDetailContent(req.raw)}</div></div>` : ''}
             </div>
         </div>`;
 }
@@ -310,17 +552,36 @@ function toggleDetails(header) {
 }
 
 // ---------------- Filters & Sorting ----------------
-function applyFilters() {
-    const levelFilter = document.getElementById('filter-level').value;
+function toggleLevelChip(level, el) {
+    if (activeLevels.has(level)) {
+        activeLevels.delete(level);
+        el.classList.remove('active');
+    } else {
+        activeLevels.add(level);
+        el.classList.add('active');
+    }
+    applyFilters();
+}
+
+function passesFilters(req) {
     const containerFilter = containerFilterEl.value;
+    const term = searchInputEl ? searchInputEl.value.trim().toLowerCase() : '';
+    const level = req.level || 'UNKNOWN';
 
-    let filtered = allRequests.filter(req => {
-        const levelMatch = levelFilter === 'all' || (req.level || 'UNKNOWN') === levelFilter;
-        const containerMatch = containerFilter === 'all' || req.container_name === containerFilter;
-        return levelMatch && containerMatch;
-    });
+    const levelMatch = activeLevels.has(level);
+    const containerMatch = containerFilter === 'all' || req.container_name === containerFilter;
+    const text = (req.message || req.raw || '').toLowerCase();
+    const searchMatch = !term || text.includes(term);
 
-    renderRequests(filtered);
+    return levelMatch && containerMatch && searchMatch;
+}
+
+function getFilteredRequests() {
+    return allRequests.filter(passesFilters);
+}
+
+function applyFilters() {
+    renderRequests(getFilteredRequests());
 }
 
 function applySort() {
@@ -344,6 +605,22 @@ function renderRequests(requests) {
 
     requestsEl.innerHTML = sorted.map(req => renderRequest(req)).join('');
     emptyStateEl.style.display = sorted.length === 0 && allRequests.length > 0 ? 'block' : 'none';
+}
+
+// ---------------- Export ----------------
+function exportLogs() {
+    const filtered = getFilteredRequests();
+    const payload = filtered.map(({ id, ...rest }) => rest); // drop the client-only synthetic id
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    a.href = url;
+    a.download = `apiwatch-logs-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
 }
 
 // ---------------- Stats & Charts ----------------
@@ -380,6 +657,8 @@ async function clearRequests() {
         allRequests = [];
         all_requests_count = 0;
         stats = { total: 0, errors: 0, history: [] };
+        pendingNewCount = 0;
+        updateLiveTailUI();
 
         requestsEl.innerHTML = '';
         emptyStateEl.style.display = 'block';
@@ -389,6 +668,14 @@ async function clearRequests() {
 
 // ---------------- Initialize ----------------
 loadTheme();
+
+const pageSizeInitEl = document.getElementById('page-size');
+if (pageSizeInitEl) {
+    pageSizeInitEl.innerHTML = PAGE_SIZES
+        .map(n => `<option value="${n}">${n}</option>`)
+        .join('');
+    pageSizeInitEl.value = String(pageLimit);
+}
 
 async function checkAuthAndInit() {
     if (localStorage.getItem('auth') !== 'true') {

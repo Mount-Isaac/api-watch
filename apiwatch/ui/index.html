@@ -4,13 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>api-watch - Live Logs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="icon" type="image/png" href="/static/logo.png" />
   </head>
   <body>
     <!-- Login Page -->
     <div id="login-page" class="login-container">
+      <div class="login-theme-toggle">
+        <button class="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle color theme" title="Toggle theme">
+          <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </button>
+      </div>
       <div class="login-box">
         <h2>api-watch</h2>
+        <div class="login-sub">container log monitor</div>
         <form id="login-form" onsubmit="login(event)">
           <input
             type="text"
@@ -38,18 +51,24 @@
     <div id="dashboard" class="hidden">
       <div class="header">
         <div class="header-left">
-          <h1>api-watch</h1>
+          <h1>api-watch<span class="cursor-blin"></span></h1>
           <div class="status">
-            <div class="status-dot"></div>
+            <div class="status-dot" id="status-dot"></div>
             <span>Live</span>
             <span>|</span>
             <span id="request-count">0 logs</span>
           </div>
         </div>
         <div class="header-right">
-          <div class="theme-toggle" onclick="toggleTheme()">
-            <div class="theme-toggle-slider"></div>
-          </div>
+          <button class="btn btn-live" id="live-tail-btn" onclick="toggleLiveTail()">
+            <span class="live-icon"></span>
+            <span id="live-tail-label">Live</span>
+          </button>
+          <button class="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle color theme" title="Toggle theme">
+            <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          </button>
+          <button class="btn" onclick="exportLogs()">Export</button>
           <button class="btn" onclick="clearRequests()">Clear</button>
           <button class="btn" onclick="logout()">Logout</button>
         </div>
@@ -74,28 +93,38 @@
         </div>
 
         <div class="controls">
-          <div class="control-group">
-            <span class="control-label">Level:</span>
-            <select class="select" id="filter-level" onchange="applyFilters()">
-              <option value="all">All</option>
-              <option value="CRITICAL">Critical</option>
-              <option value="ERROR">Error</option>
-              <option value="WARNING">Warning</option>
-              <option value="INFO">Info</option>
-              <option value="DEBUG">Debug</option>
-              <option value="UNKNOWN">Unknown</option>
-            </select>
+          <div class="control-group" style="flex: 1; min-width: 220px;">
+            <span class="control-label">Search</span>
+            <input
+              type="text"
+              id="search-input"
+              class="search-input"
+              placeholder="Filter by message content..."
+              oninput="applyFilters()"
+            />
           </div>
 
           <div class="control-group">
-            <span class="control-label">Container:</span>
+            <span class="control-label">Level</span>
+            <div class="level-chips" id="level-chips">
+              <span class="chip active" data-level="CRITICAL" onclick="toggleLevelChip('CRITICAL', this)">Critical</span>
+              <span class="chip active" data-level="ERROR" onclick="toggleLevelChip('ERROR', this)">Error</span>
+              <span class="chip active" data-level="WARNING" onclick="toggleLevelChip('WARNING', this)">Warning</span>
+              <span class="chip active" data-level="INFO" onclick="toggleLevelChip('INFO', this)">Info</span>
+              <span class="chip active" data-level="DEBUG" onclick="toggleLevelChip('DEBUG', this)">Debug</span>
+              <span class="chip active" data-level="UNKNOWN" onclick="toggleLevelChip('UNKNOWN', this)">Unknown</span>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Container</span>
             <select class="select" id="filter-container" onchange="applyFilters()">
               <option value="all">All</option>
             </select>
           </div>
 
           <div class="control-group">
-            <span class="control-label">Sort By:</span>
+            <span class="control-label">Sort</span>
             <select class="select" id="sort-by" onchange="applySort()">
               <option value="time-desc">Newest First</option>
               <option value="time-asc">Oldest First</option>
@@ -120,6 +149,9 @@
         <button id="prev-page" class="btn" onclick="prevPage()">Prev</button>
         <span id="page-num">1</span>
         <button id="next-page" class="btn" onclick="nextPage()">Next</button>
+        <span class="pagination-divider">|</span>
+        <span class="control-label">Rows</span>
+        <select class="select" id="page-size" onchange="changePageSize()"></select>
       </div>
 
       <div class="footer">
