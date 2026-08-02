@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>api-watch - Live Monitor</title>
+    <title>api-watch - Live Logs</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
@@ -43,7 +43,7 @@
             <div class="status-dot"></div>
             <span>Live</span>
             <span>|</span>
-            <span id="request-count">0 requests</span>
+            <span id="request-count">0 logs</span>
           </div>
         </div>
         <div class="header-right">
@@ -58,43 +58,39 @@
       <div class="container">
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-label">Total Requests</div>
+            <div class="stat-label">Total Logs</div>
             <div class="stat-value" id="total-requests">0</div>
             <div class="stat-chart" id="chart-total"></div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Success Rate</div>
-            <div class="stat-value" id="success-rate">100%</div>
-            <div class="stat-chart" id="chart-success"></div>
+            <div class="stat-label">Error Rate</div>
+            <div class="stat-value" id="error-rate">0%</div>
+            <div class="stat-chart" id="chart-error"></div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Avg Response Time</div>
-            <div class="stat-value" id="avg-time">0ms</div>
-            <div class="stat-chart" id="chart-time"></div>
+            <div class="stat-label">Active Containers</div>
+            <div class="stat-value" id="active-containers">0</div>
           </div>
         </div>
 
         <div class="controls">
           <div class="control-group">
-            <span class="control-label">Status:</span>
-            <select class="select" id="filter-status" onchange="applyFilters()">
+            <span class="control-label">Level:</span>
+            <select class="select" id="filter-level" onchange="applyFilters()">
               <option value="all">All</option>
-              <option value="2xx">2xx Success</option>
-              <option value="3xx">3xx Redirect</option>
-              <option value="4xx">4xx Client Error</option>
-              <option value="5xx">5xx Server Error</option>
+              <option value="CRITICAL">Critical</option>
+              <option value="ERROR">Error</option>
+              <option value="WARNING">Warning</option>
+              <option value="INFO">Info</option>
+              <option value="DEBUG">Debug</option>
+              <option value="UNKNOWN">Unknown</option>
             </select>
           </div>
 
           <div class="control-group">
-            <span class="control-label">Method:</span>
-            <select class="select" id="filter-method" onchange="applyFilters()">
+            <span class="control-label">Container:</span>
+            <select class="select" id="filter-container" onchange="applyFilters()">
               <option value="all">All</option>
-              <option value="GET">GET</option>
-              <option value="POST">POST</option>
-              <option value="PUT">PUT</option>
-              <option value="DELETE">DELETE</option>
-              <option value="PATCH">PATCH</option>
             </select>
           </div>
 
@@ -103,17 +99,15 @@
             <select class="select" id="sort-by" onchange="applySort()">
               <option value="time-desc">Newest First</option>
               <option value="time-asc">Oldest First</option>
-              <option value="duration-desc">Slowest First</option>
-              <option value="duration-asc">Fastest First</option>
-              <option value="status-asc">Status (Low to High)</option>
-              <option value="status-desc">Status (High to Low)</option>
+              <option value="level-desc">Severity (Worst First)</option>
+              <option value="level-asc">Severity (Best First)</option>
             </select>
           </div>
         </div>
 
         <div id="requests"></div>
         <div id="empty-state" class="empty-state">
-          <p>Waiting for API requests...</p>
+          <p>Waiting for container logs...</p>
           <div class="loading-dots">
             <span></span>
             <span></span>

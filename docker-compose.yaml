@@ -10,3 +10,4 @@ services:
     command: python -m apiwatch
     volumes:
     - ./data:/app/data
+    - /var/run/docker.sock:/var/run/docker.sock

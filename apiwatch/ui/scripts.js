@@ -4,20 +4,23 @@ const ERROR_EL = document.getElementById('login-error');
 const requestsEl = document.getElementById('requests');
 const emptyStateEl = document.getElementById('empty-state');
 const countEl = document.getElementById('request-count');
+const containerFilterEl = document.getElementById('filter-container');
+
+const LEVEL_RANK = { CRITICAL: 0, ERROR: 1, WARNING: 2, INFO: 3, DEBUG: 4, UNKNOWN: 5 };
+const ERROR_LEVELS = new Set(['CRITICAL', 'ERROR']);
 
 let expandedSet = new Set();
 let allRequests = [];
 let ws;
 let stats = {
     total: 0,
-    success: 0,
-    error: 0,
-    durations: [],
+    errors: 0,
     history: []
 };
+let knownContainers = new Set();
 let all_requests_count = 0;
 let currentPage = 1;
-let pageLimit = 100;
+let pageLimit = 10;
 let loadingPage = false;
 
 // ---------------- Theme management ----------------
@@ -36,7 +39,7 @@ function loadTheme() {
 // ---------------- Login handling ----------------
 async function login(event) {
     event.preventDefault();
-    
+
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
     const loginBtn = document.getElementById('login-btn');
@@ -69,6 +72,7 @@ async function login(event) {
             passwordInput.classList.remove('error');
             LOGIN_PAGE.classList.add('hidden');
             DASHBOARD.classList.remove('hidden');
+            loadContainers();
             fetchPage(1);
             initWebSocket();
         } else {
@@ -91,17 +95,16 @@ function logout() {
     localStorage.removeItem('auth');
     DASHBOARD.classList.add('hidden');
     LOGIN_PAGE.classList.remove('hidden');
-    
+
     if (ws) ws.close();
     allRequests = [];
     all_requests_count = 0;
-    stats = { total: 0, success: 0, error: 0, durations: [], history: [] };
+    stats = { total: 0, errors: 0, history: [] };
+    knownContainers = new Set();
 
-    // Reset displayed counts
-    countEl.textContent = `${all_requests_count} requests`;
+    countEl.textContent = `${all_requests_count} logs`;
     document.getElementById('total-requests').textContent = all_requests_count;
 
-    // Clear request list
     requestsEl.innerHTML = '';
     emptyStateEl.style.display = 'block';
 }
@@ -119,6 +122,39 @@ function initWebSocket() {
     ws.onclose = () => console.log('WebSocket disconnected');
 }
 
+// ---------------- Containers filter ----------------
+async function loadContainers() {
+    try {
+        const res = await fetch('/api/containers');
+        const result = await res.json();
+        (result.containers || []).forEach(name => knownContainers.add(name));
+        renderContainerOptions();
+    } catch (err) {
+        console.log('failed to load containers', err);
+    }
+}
+
+function renderContainerOptions() {
+    const current = containerFilterEl.value;
+    const names = Array.from(knownContainers).sort();
+
+    containerFilterEl.innerHTML = '<option value="all">All</option>' +
+        names.map(name => `<option value="${name}">${name}</option>`).join('');
+
+    // keep whatever the user had selected, if it still exists
+    if (names.includes(current) || current === 'all') {
+        containerFilterEl.value = current;
+    }
+}
+
+function noteContainer(name) {
+    if (!name || knownContainers.has(name)) return;
+    // a new container shows up mid-session, we add it, we never remove
+    // one just because it stopped, its past logs are still browsable
+    knownContainers.add(name);
+    renderContainerOptions();
+}
+
 // ---------------- Pagination ----------------
 async function fetchPage(page) {
     if (loadingPage) return;
@@ -131,7 +167,7 @@ async function fetchPage(page) {
     all_requests_count = result.data.total;
     allRequests = result.data.results;
 
-    // Recalculate stats from allRequests
+    allRequests.forEach(r => noteContainer(r.container_name));
     recalcStats();
 
     renderRequests(allRequests);
@@ -153,23 +189,16 @@ function prevPage() {
 // ---------------- Requests handling ----------------
 function addRequest(req, skipRender = false) {
     emptyStateEl.style.display = 'none';
-    
+
     req.id = Date.now() + Math.random();
     allRequests.unshift(req);
     all_requests_count++;
+    noteContainer(req.container_name);
 
-    // Update stats incrementally
     stats.total++;
-    const statusCode = parseInt(req.status_code);
-    if (statusCode >= 200 && statusCode < 400) stats.success++;
-    else stats.error++;
+    if (ERROR_LEVELS.has(req.level)) stats.errors++;
 
-    if (req.duration_ms) {
-        stats.durations.push(req.duration_ms);
-        if (stats.durations.length > 20) stats.durations.shift();
-    }
-
-    stats.history.push({ time: Date.now(), success: statusCode < 400 });
+    stats.history.push({ time: Date.now(), isError: ERROR_LEVELS.has(req.level) });
     if (stats.history.length > 20) stats.history.shift();
 
     updateStats();
@@ -179,10 +208,11 @@ function addRequest(req, skipRender = false) {
 
 function recalcStats() {
     stats.total = allRequests.length;
-    stats.success = allRequests.filter(r => parseInt(r.status_code) >= 200 && parseInt(r.status_code) < 400).length;
-    stats.error = stats.total - stats.success;
-    stats.durations = allRequests.filter(r => r.duration_ms).map(r => r.duration_ms);
-    stats.history = allRequests.slice(-20).map(r => ({ time: new Date(r.timestamp).getTime(), success: parseInt(r.status_code) < 400 }));
+    stats.errors = allRequests.filter(r => ERROR_LEVELS.has(r.level)).length;
+    stats.history = allRequests.slice(-20).map(r => ({
+        time: new Date(r.timestamp).getTime(),
+        isError: ERROR_LEVELS.has(r.level)
+    }));
     updateStats();
 }
 
@@ -196,24 +226,24 @@ function renderNewRequest(req) {
 }
 
 function renderRequest(req) {
-    const serviceBadge = req.service ? `<span class="service-badge">${req.service}</span>` : '';
-    const statusClass = req.status_code < 300 ? 'success' : req.status_code < 400 ? 'redirect' : 'error';
+    const level = req.level || 'UNKNOWN';
+    const containerBadge = req.container_name
+        ? `<span class="service-badge">${req.container_name}</span>`
+        : '';
+    const timestamp = req.timestamp ? new Date(req.timestamp) : null;
+    const timeLabel = timestamp && !isNaN(timestamp) ? timestamp.toLocaleTimeString() : '---';
 
     return `
         <div class="request-item" data-id="${req.id}">
             <div class="request-header" onclick="toggleDetails(this)">
-                ${serviceBadge}
-                <span class="method ${req.method}">${req.method}</span>
-                <span class="path">${req.path}</span>
-                <span class="status-code ${statusClass}">${req.status_code || '---'}</span>
-                <span class="duration">${req.duration_ms ? req.duration_ms + 'ms' : '---'}</span>
-                <span class="timestamp">${new Date(req.timestamp).toLocaleTimeString()} UTC</span>
+                ${containerBadge}
+                <span class="level level-${level}">${level}</span>
+                <span class="message">${req.message || req.raw || ''}</span>
+                <span class="timestamp">${timeLabel}</span>
             </div>
             <div class="request-details ${expandedSet.has(req.id) ? 'open' : ''}">
-                ${req.query_params && Object.keys(req.query_params).length ? `<div class="detail-section"><div class="detail-label">Query Parameters</div><div class="detail-content"><pre>${JSON.stringify(req.query_params, null, 2)}</pre></div></div>` : ''}
-                ${req.request_data ? `<div class="detail-section"><div class="detail-label">Request Body</div><div class="detail-content"><pre>${JSON.stringify(req.request_data, null, 2)}</pre></div></div>` : ''}
-                ${req.response_data ? `<div class="detail-section"><div class="detail-label">Response</div><div class="detail-content"><pre>${typeof req.response_data === 'object' ? JSON.stringify(req.response_data, null, 2) : req.response_data}</pre></div></div>` : ''}
-                ${req.headers && Object.keys(req.headers).length ? `<div class="detail-section"><div class="detail-label">Headers</div><div class="detail-content"><pre>${JSON.stringify(req.headers, null, 2)}</pre></div></div>` : ''}
+                ${req.logger ? `<div class="detail-section"><div class="detail-label">Logger</div><div class="detail-content"><pre>${req.logger}</pre></div></div>` : ''}
+                ${req.raw ? `<div class="detail-section"><div class="detail-label">Raw Line</div><div class="detail-content"><pre>${req.raw}</pre></div></div>` : ''}
             </div>
         </div>`;
 }
@@ -228,18 +258,13 @@ function toggleDetails(header) {
 
 // ---------------- Filters & Sorting ----------------
 function applyFilters() {
-    const statusFilter = document.getElementById('filter-status').value;
-    const methodFilter = document.getElementById('filter-method').value;
+    const levelFilter = document.getElementById('filter-level').value;
+    const containerFilter = containerFilterEl.value;
 
     let filtered = allRequests.filter(req => {
-        const statusCode = parseInt(req.status_code);
-        let statusMatch = true;
-        if (statusFilter !== 'all') {
-            const filterRange = parseInt(statusFilter.substring(0, 1));
-            statusMatch = Math.floor(statusCode / 100) === filterRange;
-        }
-        const methodMatch = methodFilter === 'all' || req.method === methodFilter;
-        return statusMatch && methodMatch;
+        const levelMatch = levelFilter === 'all' || (req.level || 'UNKNOWN') === levelFilter;
+        const containerMatch = containerFilter === 'all' || req.container_name === containerFilter;
+        return levelMatch && containerMatch;
     });
 
     renderRequests(filtered);
@@ -253,13 +278,15 @@ function renderRequests(requests) {
     const sortBy = document.getElementById('sort-by').value;
 
     let sorted = [...requests];
-    switch(sortBy) {
+    switch (sortBy) {
         case 'time-asc': sorted.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)); break;
         case 'time-desc': sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); break;
-        case 'duration-asc': sorted.sort((a, b) => (a.duration_ms || 0) - (b.duration_ms || 0)); break;
-        case 'duration-desc': sorted.sort((a, b) => (b.duration_ms || 0) - (a.duration_ms || 0)); break;
-        case 'status-asc': sorted.sort((a, b) => (a.status_code || 0) - (b.status_code || 0)); break;
-        case 'status-desc': sorted.sort((a, b) => (b.status_code || 0) - (a.status_code || 0)); break;
+        case 'level-desc':
+            sorted.sort((a, b) => (LEVEL_RANK[a.level] ?? 5) - (LEVEL_RANK[b.level] ?? 5));
+            break;
+        case 'level-asc':
+            sorted.sort((a, b) => (LEVEL_RANK[b.level] ?? 5) - (LEVEL_RANK[a.level] ?? 5));
+            break;
     }
 
     requestsEl.innerHTML = sorted.map(req => renderRequest(req)).join('');
@@ -268,42 +295,38 @@ function renderRequests(requests) {
 
 // ---------------- Stats & Charts ----------------
 function updateStats() {
-    countEl.textContent = `${all_requests_count} request${all_requests_count !== 1 ? 's' : ''}`;
+    countEl.textContent = `${all_requests_count} log${all_requests_count !== 1 ? 's' : ''}`;
     document.getElementById('total-requests').textContent = all_requests_count;
 
-    const successRate = stats.total > 0 ? Math.round((stats.success / stats.total) * 100) : 0;
-    document.getElementById('success-rate').textContent = successRate + '%';
+    const errorRate = stats.total > 0 ? Math.round((stats.errors / stats.total) * 100) : 0;
+    document.getElementById('error-rate').textContent = errorRate + '%';
 
-    const avgTime = stats.durations.length > 0 
-        ? (stats.durations.reduce((a, b) => a + b, 0) / stats.durations.length).toFixed(2)
-        : '0.00';
-    document.getElementById('avg-time').textContent = avgTime + 'ms';
+    // distinct containers within the currently loaded window, this is
+    // an approximation of "active", we don't have a live container list
+    // to compare against here, only what's shown up in logs so far
+    const containersInView = new Set(allRequests.map(r => r.container_name).filter(Boolean));
+    document.getElementById('active-containers').textContent = containersInView.size;
 
-    updateCharts(); 
+    updateCharts();
 }
-
 
 function updateCharts() {
     const chartTotal = document.getElementById('chart-total');
     chartTotal.innerHTML = stats.history.slice(-10).map((h, i) => `<div class="chart-bar ${i === stats.history.length - 1 ? 'active' : ''}" style="height: ${20 + (i * 2)}px"></div>`).join('');
 
-    const chartSuccess = document.getElementById('chart-success');
-    chartSuccess.innerHTML = stats.history.slice(-10).map(h => `<div class="chart-bar ${h.success ? 'active' : ''}" style="height: ${h.success ? 40 : 15}px; opacity: ${h.success ? 1 : 0.3}"></div>`).join('');
-
-    const chartTime = document.getElementById('chart-time');
-    const maxDuration = Math.max(...stats.durations.slice(-10), 1);
-    chartTime.innerHTML = stats.durations.slice(-10).map(d => `<div class="chart-bar" style="height: ${(d / maxDuration) * 40}px"></div>`).join('');
+    const chartError = document.getElementById('chart-error');
+    chartError.innerHTML = stats.history.slice(-10).map(h => `<div class="chart-bar ${h.isError ? 'active' : ''}" style="height: ${h.isError ? 40 : 15}px; opacity: ${h.isError ? 1 : 0.3}"></div>`).join('');
 }
 
 // ---------------- Clear ----------------
 async function clearRequests() {
-    if (confirm('Clear all requests?')) {
-        const res = await fetch('/api/clear', { method: 'POST', headers: { 'Content-Type': 'application/json' }});
+    if (confirm('Clear all logs?')) {
+        const res = await fetch('/api/clear', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
         await res.json();
 
         allRequests = [];
         all_requests_count = 0;
-        stats = { total: 0, success: 0, error: 0, durations: [], history: [] };
+        stats = { total: 0, errors: 0, history: [] };
 
         requestsEl.innerHTML = '';
         emptyStateEl.style.display = 'block';
@@ -317,6 +340,7 @@ loadTheme();
 if (localStorage.getItem('auth') === 'true') {
     LOGIN_PAGE.classList.add('hidden');
     DASHBOARD.classList.remove('hidden');
+    loadContainers();
     fetchPage(1);
     initWebSocket();
 }

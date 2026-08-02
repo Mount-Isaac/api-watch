@@ -102,12 +102,6 @@ body {
     background: var(--accent);
     animation: pulse 2s infinite;
 }
-.empty-state {
-    text-align: center;
-    margin-top: 50px;
-    font-family: sans-serif;
-    color: #666;
-}
 
 .loading-dots {
     display: flex;
@@ -305,80 +299,59 @@ body {
     color: var(--text-secondary);
     font-weight: 600;
     text-transform: uppercase;
+    flex-shrink: 0;
 }
 
-.method {
+.level {
     padding: 4px 8px;
     border-radius: 3px;
     font-weight: 600;
     font-size: 11px;
     text-transform: uppercase;
+    flex-shrink: 0;
 }
 
-.method.GET {
-    background: var(--success-bg);
-    color: var(--success-text);
-}
-
-.method.POST {
-    background: var(--info-bg);
-    color: var(--info-text);
-}
-
-.method.PUT {
-    background: var(--warning-bg);
-    color: var(--warning-text);
-}
-
-.method.DELETE {
+.level-CRITICAL,
+.level-ERROR {
     background: var(--error-bg);
     color: var(--error-text);
 }
 
-.method.PATCH {
+.level-WARNING {
     background: var(--warning-bg);
     color: var(--warning-text);
 }
 
-.path {
+.level-INFO {
+    background: var(--success-bg);
+    color: var(--success-text);
+}
+
+.level-DEBUG {
+    background: var(--info-bg);
+    color: var(--info-text);
+}
+
+.level-UNKNOWN {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.message {
+    /* collapsed-row preview only, single line, truncated, full text
+       lives in .detail-content once expanded */
     flex: 1;
-    font-weight: 500;
     color: var(--text-primary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-.status-code {
-    padding: 4px 8px;
-    border-radius: 3px;
-    font-weight: 600;
-    font-size: 11px;
-}
-
-.status-code.success {
-    background: var(--success-bg);
-    color: var(--success-text);
-}
-
-.status-code.error {
-    background: var(--error-bg);
-    color: var(--error-text);
-}
-
-.status-code.redirect {
-    background: var(--info-bg);
-    color: var(--info-text);
-}
-
-.duration {
-    color: var(--text-secondary);
-    font-size: 11px;
+    min-width: 0;
 }
 
 .timestamp {
     color: var(--text-tertiary);
     font-size: 11px;
+    flex-shrink: 0;
 }
 
 .request-details {
@@ -409,6 +382,10 @@ body {
     padding: 10px;
     border-radius: 4px;
     border: 1px solid var(--border);
+    /* large logs get a scrollbar instead of expanding the whole page,
+       this is also what keeps the row header reachable to collapse */
+    max-height: 320px;
+    overflow-y: auto;
     overflow-x: auto;
 }
 
@@ -545,6 +522,7 @@ body {
 body.light-mode .theme-toggle-slider {
     transform: translateX(18px);
 }
+
 .pagination {
     display: flex;
     justify-content: center;

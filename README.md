@@ -237,6 +237,8 @@ services:
       - WATCHDOG_PASSWORD=admin
       - API_WATCH_DASHBOARD_HOST=0.0.0.
       - API_WATCH_DASHBOARD_PORT=22222
+    volumes:
+      - data:/app/data
     command: python -m apiwatch
 ```
 

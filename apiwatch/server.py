@@ -12,6 +12,7 @@ from aiohttp import web
 from collections import deque
 from .ui import template
 from utils.db_sqlite import AsyncDB
+from ._docker.docker_collector import DockerCollector
 
 
 
@@ -35,7 +36,23 @@ class DashboardServer:
         self.runner = None
         db_path = Path(__file__).parent.parent / 'data' / 'apiwatch.db'
         self.db = AsyncDB(db_path)
+        # DockerCollector never touches db.init() itself, it just uses
+        # this same connection once we've initialized it in start()
+        self.collector = DockerCollector(db=self.db, broadcast=self.broadcast)
     
+    async def broadcast(self, data: dict):
+        """Push a record to every connected dashboard websocket client."""
+        if not self.ws_clients:
+            return
+        message = json.dumps(data)
+        dead_clients = set()
+        for ws in self.ws_clients:
+            try:
+                await ws.send_str(message)
+            except Exception:
+                dead_clients.add(ws)
+        self.ws_clients -= dead_clients
+
     async def websocket_handler(self, request):
         """Handle WebSocket connections from browsers"""
         ws = web.WebSocketResponse()
@@ -61,9 +78,6 @@ class DashboardServer:
     
     async def dashboard_handler(self, request):
         """Serve the dashboard HTML"""
-        # html = template.replace('REPLACE_USERNAME', self.username)
-        # html = html.replace('REPLACE_PASSWORD', self.password)
-
         return web.Response(text=template(), content_type='text/html')
     
     async def get_auth_credentials(self, request, **kwargs):
@@ -76,34 +90,7 @@ class DashboardServer:
         auth_response = { 'message': 'success' } if is_match else { 'message': 'Invalid credentials.' }
         
         return web.json_response(auth_response)
-    
-    async def api_publish_handler(self, request):
-        """Receive request data from microservices and broadcast to browsers"""
-        try:
-            data = await request.json()
-            
-            # Store in history
-            self.history.append(data)
-            total_count = await self.db.insert_log(**data)
-            
-            # Broadcast to all browser WebSocket clients
-            data.update({ 'total': total_count })
-            if self.ws_clients:
-                message = json.dumps(data)
-                dead_clients = set()
-                
-                for ws in self.ws_clients:
-                    try:
-                        await ws.send_str(message)
-                    except Exception:
-                        dead_clients.add(ws)
-                
-                self.ws_clients -= dead_clients
-            
-            return web.json_response({'status': 'ok'})
-        except Exception as e:
-            return web.json_response({'status': 'error', 'message': str(e)}, status=500)
-    
+
     async def api_history_handler(self, request):
         page = int(request.query.get("page", 1))
         limit = int(request.query.get("limit", 20))
@@ -114,6 +101,15 @@ class DashboardServer:
             "limit": limit,
             "data": logs
         })
+
+    async def api_containers_handler(self, request):
+        """
+        Distinct container names seen so far, including ones from
+        containers that have since stopped, their log rows persist so
+        the name stays filterable in the dashboard.
+        """
+        containers = await self.db.get_distinct_containers()
+        return web.json_response({"containers": containers})
     
     async def api_clear_handler(self, request):
         """Clear history"""
@@ -132,8 +128,8 @@ class DashboardServer:
         self.app.router.add_get('/', self.dashboard_handler)
         self.app.router.add_get('/ws', self.websocket_handler)
         self.app.router.add_post('/auth', self.get_auth_credentials)
-        self.app.router.add_post('/api/publish', self.api_publish_handler)
         self.app.router.add_get('/api/history', self.api_history_handler)
+        self.app.router.add_get('/api/containers', self.api_containers_handler)
         self.app.router.add_post('/api/clear', self.api_clear_handler)
         
         self.runner = web.AppRunner(self.app)
@@ -142,10 +138,14 @@ class DashboardServer:
         site = web.TCPSite(self.runner, self.host, self.port)
         await site.start()
         
+        # db is initialized above, collector only starts once that's done
+        await self.collector.start()
+        
         print(f"[ApiWatchdog] Dashboard started at http://{self.host}:{self.port}")
     
     async def stop(self):
         """Stop the server"""
+        await self.collector.stop()
         if self.runner:
             await self.runner.cleanup()
 
@@ -165,33 +165,24 @@ def is_dashboard_running(host='localhost', port=22222):
 def start_dashboard_server(host='0.0.0.0', port=22222, username='admin', password='admin'):
     """
     Start dashboard server (auto-start if not running)
-    
-    This function is smart:
-    - Checks if dashboard is already running
-    - If yes: connects to it (does nothing)
-    - If no: starts a new dashboard server
-    
+
     Works like RabbitMQ - first app starts it, others connect
     """
     global _dashboard_server, _server_lock
     
-    # Prevent Flask debug mode from starting duplicate servers
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         return None
     
     with _server_lock:
-        # Check if already started in this process
         if _dashboard_server is not None:
             return None
         
-        # Check if dashboard is running elsewhere
         if is_dashboard_running(host, port):
             print(f"[ApiWatchdog] Dashboard already running at http://{host}:{port}")
             print(f"[ApiWatchdog] Connecting to existing dashboard...")
-            _dashboard_server = 'external'  # Mark as externally managed
+            _dashboard_server = 'external'
             return None
         
-        # Start new dashboard server
         _dashboard_server = 'starting'
         
         def run_server():
@@ -204,7 +195,6 @@ def start_dashboard_server(host='0.0.0.0', port=22222, username='admin', passwor
         thread = threading.Thread(target=run_server, daemon=True)
         thread.start()
         
-        # Wait a bit for server to start
         import time
         time.sleep(0.5)
         
@@ -218,16 +208,15 @@ async def run_standalone(host='0.0.0.0', port=22222, username='admin', password=
     await server.start()
     
     print("=" * 60)
-    print("🐕 ApiWatchdog Dashboard Server (Standalone Mode)")
+    print("ApiWatchdog Dashboard Server (Standalone Mode)")
     print("=" * 60)
-    print(f"📊 Dashboard: http://{host}:{port}")
-    print(f"🔌 WebSocket: ws://{host}:{port}/ws")
-    print(f"📡 Publish Endpoint: http://{host}:{port}/api/publish")
+    print(f"Dashboard: http://{host}:{port}")
+    print(f"WebSocket: ws://{host}:{port}/ws")
+    print(f"Docker collector: watching containers ({'all' if server.collector.watch_all else 'labelled'})")
     print("=" * 60)
-    print("Waiting for microservices to connect...")
-    print("=" * 60)
+    print("Waiting for container logs...")
+    print("=" * 60, end="\n\n")
     
-    # Keep running forever
     try:
         await asyncio.Event().wait()
     except KeyboardInterrupt:
