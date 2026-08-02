@@ -65,7 +65,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKER_REGISTRY }}/${{ github.event.repository.name }}:latest
+            ${{ secrets.DOCKER_REGISTRY }}/${{ github.event.repository.name }}:v2
             ${{ secrets.DOCKER_REGISTRY }}/${{ github.event.repository.name }}:${{ steps.versioning.outputs.version }}
           
       # - name: Create Git tag
