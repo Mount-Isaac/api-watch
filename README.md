@@ -31,46 +31,17 @@ A lightweight, developer-focused tool that streams your API requests, responses,
 
 ### Installation
 
-**For Flask:**
 
+
+
+###### git clone https 
 ```bash
-pip install api-watch[flask]
+git clone https://github.com/Mount-Isaac/api-watch.git
 ```
 
-**For FastAPI:**
-
+###### git clone ssh 
 ```bash
-pip install api-watch[fastapi]
-```
-
-**For both:**
-
-```bash
-pip install api-watch[all]
-```
-
-### Flask Integration (Auto-Start)
-
-```python
-from flask import Flask
-from apiwatch import ApiWatcher
-from apiwatch.middleware_flask import FlaskWatchMiddleware
-
-app = Flask(__name__)
-
-# Dashboard auto-starts
-api_watcher = ApiWatcher(service_name='my-flask-app')
-FlaskWatchMiddleware(app, api_watcher)
-
-@app.route('/api/health', methods=['GET'])
-def health():
-    return jsonify({
-        "status": "healthy",
-        "service": "flask-service"
-    })
-
-if __name__ == '__main__':
-    app.run(port=5000)
+git@github.com:Mount-Isaac/api-watch.git
 ```
 
 **Terminal run:**
@@ -94,45 +65,7 @@ http://localhost:22222
 
 ---
 
-### FastAPI Integration
-
-```python
-from fastapi import FastAPI
-from pydantic import BaseModel
-from apiwatch import ApiWatcher
-from apiwatch.middleware_fastapi import FastAPIWatchMiddleware
-
-app = FastAPI()
-
-api_watcher = ApiWatcher(
-    service_name='fastapi-service',
-    dashboard_host='localhost',
-    auto_start_dashboard=False
-)
-
-app.add_middleware(FastAPIWatchMiddleware, watcher=api_watcher)
-
-@app.get("/api/health")
-async def health():
-    return {
-        "status": "healthy",
-        "service": "fastapi-service"
-    }
-
-if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-```
-
-**Run it:**
-
-```bash
-uvicorn app:app --port 8000
-```
-
----
-
-## 📊 Dashboard Features
+##  Dashboard Features
 
 ### Real-time Request Monitoring
 
@@ -148,76 +81,8 @@ uvicorn app:app --port 8000
 - Sort by newest, oldest, fastest, sloweset, status(high-low)
 - Filter by HTTP method
 
-### Request Details
-
-- Full request/response bodies
-- Query parameters
-- Headers (sensitive headers filtered)
-- Timestamp and duration
 
 ---
-
-## Configuration
-
-### Basic Options
-
-```python
-api_watcher = ApiWatcher(
-    service_name='my-app',           # Service identifier
-    dashboard_host='localhost',      # Dashboard host
-    dashboard_port=22222,            # Dashboard port
-    auto_start_dashboard=True        # Auto-start if not running
-)
-```
-
-### Middleware Options
-
-**Flask:**
-
-```python
-FlaskWatchMiddleware(
-    app,
-    api_watcher,
-    capture_request_body=True,   # Log request bodies
-    capture_response_body=True   # Log response bodies
-)
-```
-
-**FastAPI:**
-
-```python
-app.add_middleware(
-    FastAPIWatchMiddleware,
-    watcher=api_watcher,
-    capture_request_body=True,   # Log request bodies
-    capture_response_body=True   # Log response bodies
-)
-```
-
----
-
-## Production Deployment
-
-### Standalone Mode
-
-For production, run the dashboard as a separate service:
-
-**Terminal 1: Start Dashboard**
-
-```bash
-python -m apiwatch
-```
-
-**Terminal 2: Start Your App**
-
-```python
-from apiwatch import ApiWatcher
-
-api_watcher = ApiWatcher(
-    service_name='my-app',
-    auto_start_dashboard=False  # Don't auto-start in production
-)
-```
 
 ### Docker Compose
 
@@ -239,73 +104,7 @@ services:
       - API_WATCH_DASHBOARD_PORT=22222
     volumes:
       - data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
     command: python -m apiwatch
 ```
-
-````yaml
-services:
-  test_flask_app:
-    image: theisaac/files-webapp:latest
-    restart: always
-    networks:
-      - test-network
-    environment:
-      - API_WATCH_MAX_HISTORY=3000
-      - API_WATCH_DASHBOARD_HOST=apiwatch
-      - API_WATCH_DASHBOARD_PORT=22222
-      - API_WATCH_AUTO_START=false
-    ports:
-      - 1515:1515
-
-#### NOTE
-In Dockerized applications, ensure that the **apiwatch** container and your **Flask/FastAPI** containers are on the same network.
-Also, use the container name `apiwatch` as the host name in your Flask app.
-
-
-**Service code:**
-```python
-import os
-from apiwatch import ApiWatcher
-
-api_watcher = ApiWatcher(
-    service_name=os.getenv('SERVICE_NAME', 'api-service'),
-    dashboard_host=os.getenv('WATCHDOG_HOST', 'localhost'),
-    dashboard_port=int(os.getenv('WATCHDOG_PORT', 22222)),
-    auto_start_dashboard=False
-)
-````
-
----
-
-## How It Works
-
-```
-Flask/FastAPI Request
-        ↓
-   Middleware intercepts
-        ↓
-   Queue.put_nowait() (non-blocking, <0.1ms)
-        ↓
-   App continues normally
-        ↓
-Background Async Worker
-        ↓
-HTTP POST to Dashboard
-        ↓
-Dashboard broadcasts via WebSocket
-        ↓
-Browser UI updates in real-time
-```
-
-**Zero blocking!** Your API never waits for logging.
-
----
-
-## Requirements
-
-- Python 3.7+
-- aiohttp 3.8+ (always required)
-- Flask 2.0+ (optional - only for Flask integration)
-- FastAPI 0.68+ & Starlette 0.14+ (optional - only for FastAPI integration)
-
 ---
