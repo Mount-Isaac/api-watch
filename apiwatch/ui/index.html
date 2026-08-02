@@ -5,16 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>api-watch - Live Logs</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
+    <!-- <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" /> -->
+    <!-- <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"> -->
+    <!-- <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"> -->
     <link rel="stylesheet" href="/static/styles.css" />
     <link rel="icon" type="image/png" href="/static/logo.png" />
   </head>
   <body>
+    <!-- Loading gate - shown until the /api/me auth check resolves, so we
+         never flash the login page for a second before redirecting into
+         the dashboard on a valid session. Reuses the same wordmark/dots
+         components as elsewhere so it doesn't look like a separate screen. -->
+    <div id="app-loading" class="app-loading">
+      <div class="app-loading-mark">api-watch<span class="cursor-blink"></span></div>
+      <div class="loading-dots">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
     <!-- Login Page -->
-    <div id="login-page" class="login-container">
+    <div id="login-page" class="login-container hidden">
       <div class="login-theme-toggle">
         <button class="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle color theme" title="Toggle theme">
           <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
@@ -51,7 +63,7 @@
     <div id="dashboard" class="hidden">
       <div class="header">
         <div class="header-left">
-          <h1>api-watch<span class="cursor-blin"></span></h1>
+          <h1>api-watch<span class="cursor-blink"></span></h1>
           <div class="status">
             <div class="status-dot" id="status-dot"></div>
             <span>Live</span>
@@ -90,6 +102,34 @@
             <div class="stat-label">Active Containers</div>
             <div class="stat-value" id="active-containers">0</div>
           </div>
+          <div class="stat-card alert-card" id="alert-card">
+            <div class="alert-card-top">
+              <div class="stat-label">Alerts</div>
+              <span id="alerts-status-badge" class="alerts-status-badge">Disabled</span>
+            </div>
+            <div class="alert-card-controls">
+              <select class="select" id="alert-channel" onchange="onAlertChannelChange()">
+                <option value="slack">Slack</option>
+                <option value="gmail">Gmail</option>
+              </select>
+              <select class="select" id="alert-min-level">
+                <option value="CRITICAL">Critical only</option>
+                <option value="ERROR" selected>Error &amp; Critical</option>
+                <option value="WARNING">Warning &amp; above</option>
+              </select>
+            </div>
+            <div class="alert-card-footer">
+              <label class="alert-enable-label">
+                <input type="checkbox" id="alert-enabled" />
+                Enabled
+              </label>
+              <div class="alert-save-wrap">
+                <span id="alert-save-flash" class="alert-save-flash">Saved</span>
+                <button class="btn btn-sm" onclick="saveAlertSettings()">Save</button>
+              </div>
+            </div>
+            <div id="alert-warning" class="alert-warning hidden"></div>
+          </div>
         </div>
 
         <div class="controls">
@@ -100,19 +140,19 @@
               id="search-input"
               class="search-input"
               placeholder="Filter by message content..."
-              oninput="applyFilters()"
+              oninput="onSearchInput()"
             />
           </div>
 
           <div class="control-group">
             <span class="control-label">Level</span>
             <div class="level-chips" id="level-chips">
-              <span class="chip active" data-level="CRITICAL" onclick="toggleLevelChip('CRITICAL', this)">Critical</span>
-              <span class="chip active" data-level="ERROR" onclick="toggleLevelChip('ERROR', this)">Error</span>
-              <span class="chip active" data-level="WARNING" onclick="toggleLevelChip('WARNING', this)">Warning</span>
-              <span class="chip active" data-level="INFO" onclick="toggleLevelChip('INFO', this)">Info</span>
-              <span class="chip active" data-level="DEBUG" onclick="toggleLevelChip('DEBUG', this)">Debug</span>
-              <span class="chip active" data-level="UNKNOWN" onclick="toggleLevelChip('UNKNOWN', this)">Unknown</span>
+              <span class="chip" data-level="CRITICAL" onclick="toggleLevelChip('CRITICAL', this)">Critical</span>
+              <span class="chip" data-level="ERROR" onclick="toggleLevelChip('ERROR', this)">Error</span>
+              <span class="chip" data-level="WARNING" onclick="toggleLevelChip('WARNING', this)">Warning</span>
+              <span class="chip" data-level="INFO" onclick="toggleLevelChip('INFO', this)">Info</span>
+              <span class="chip" data-level="DEBUG" onclick="toggleLevelChip('DEBUG', this)">Debug</span>
+              <span class="chip" data-level="UNKNOWN" onclick="toggleLevelChip('UNKNOWN', this)">Unknown</span>
             </div>
           </div>
 
@@ -154,15 +194,13 @@
         <select class="select" id="page-size" onchange="changePageSize()"></select>
       </div>
 
-      <div class="footer">
-        <span>&copy; Isaac Kyalo</span> |
-        <a
-          class="link"
-          href="https://github.com/mount-isaac/api-watch"
-          target="_blank"
-          >GitHub</a
-        >
-      </div>
+    </div>
+
+    <div class="footer">
+      <span>&copy; Isaac Kyalo</span> |
+      <a class="link" href="https://github.com/mount-isaac/api-watch" target="_blank">GitHub</a>
+      |
+      <a class="link fund-link" href="https://ko-fi.com/isaackyalo" target="_blank">☕ Fund Me</a>
     </div>
 
     <script src="/static/scripts.js"></script>

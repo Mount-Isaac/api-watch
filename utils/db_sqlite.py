@@ -59,6 +59,18 @@ class AsyncDB:
             );
             ''')
 
+            # single-row config for alerting, the user picks channel +
+            # threshold from the UI, credentials themselves stay in env
+            # vars, never stored here
+            await db.execute('''
+            CREATE TABLE IF NOT EXISTS alert_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                channel TEXT,
+                min_level TEXT DEFAULT 'ERROR',
+                enabled INTEGER DEFAULT 0
+            );
+            ''')
+
             await db.execute(
                 'CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON container_logs(timestamp)'
             )
@@ -146,21 +158,30 @@ class AsyncDB:
             await db.commit()
             return cur.rowcount
 
-    async def get_logs_paginated(self, page=1, limit=20):
+    async def get_logs_paginated(self, page=1, limit=20, search: Optional[str] = None):
         offset = (page - 1) * limit
 
-        query = """
+        where_clause = ""
+        params: List = []
+        if search:
+            where_clause = "WHERE message LIKE ? OR raw LIKE ?"
+            term = f"%{search}%"
+            params = [term, term]
+
+        query = f"""
             SELECT
                 *,
                 COUNT(*) OVER() AS total_count
             FROM container_logs
+            {where_clause}
             ORDER BY timestamp DESC
             LIMIT ? OFFSET ?
         """
+        params += [limit, offset]
 
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
-            cursor = await db.execute(query, (limit, offset))
+            cursor = await db.execute(query, params)
             rows = await cursor.fetchall()
 
         results = []
@@ -225,6 +246,27 @@ class AsyncDB:
             )
             rows = await cur.fetchall()
             return {row[0] or 'UNKNOWN': row[1] for row in rows}
+
+    # ---- alert settings ----
+
+    async def get_alert_settings(self) -> Optional[Dict]:
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute('SELECT * FROM alert_settings WHERE id = 1')
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+    async def save_alert_settings(self, channel: str, min_level: str, enabled: bool):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('''
+                INSERT INTO alert_settings (id, channel, min_level, enabled)
+                VALUES (1, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    channel = excluded.channel,
+                    min_level = excluded.min_level,
+                    enabled = excluded.enabled
+            ''', (channel, min_level, int(enabled)))
+            await db.commit()
 
     # ---- sessions (auth) ----
 

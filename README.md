@@ -97,6 +97,11 @@ services:
     restart: unless-stopped
     environment:
       - API_WATCH_MAX_HISTORY=3000
+      - WATCHDOG_USERNAME=admin
+      - WATCHDOG_PASSWORD=password
+      - APIWATCH_SLACK_WEBHOOK_URL=[your-slack-webhook-generated-from-apps]
+      - APIWATCH_GMAIL_USER=[your-email]@gmail.com
+      - APIWATCH_GMAIL_APP_PASSWORD=[your-app-password-generated]
     volumes:
     - ./data:/app/data
     - /var/run/docker.sock:/var/run/docker.sock

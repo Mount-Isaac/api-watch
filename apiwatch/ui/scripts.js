@@ -1,4 +1,4 @@
-console.log('[apiwatch] scripts.js loaded, build: v3-redesign');
+console.log('[apiwatch] scripts.js loaded, build: v3-redesign+alerts');
 
 const DASHBOARD = document.getElementById('dashboard');
 const LOGIN_PAGE = document.getElementById('login-page');
@@ -34,12 +34,12 @@ let currentPage = 1;
 // rows-per-page: also doubles as the cap on the live-stream buffer (see
 // addRequest), so changing it affects both the paginated fetch size and
 // how many live rows are kept in memory before the oldest rolls off
-let pageLimit = parseInt(localStorage.getItem('pageLimit'), 10) || 100;
+let pageLimit = parseInt(localStorage.getItem('pageLimit'), 10) || 20;
 let loadingPage = false;
 
 function changePageSize() {
     const pageSizeEl = document.getElementById('page-size');
-    pageLimit = parseInt(pageSizeEl.value, 10) || 100;
+    pageLimit = parseInt(pageSizeEl.value, 10) || 20;
     localStorage.setItem('pageLimit', pageLimit);
     // trim what's already in memory too, so a live buffer that was built
     // up at the old size doesn't stay oversized until the next log arrives
@@ -55,8 +55,11 @@ function changePageSize() {
 let isLive = true;
 let pendingNewCount = 0;
 
-// active level filter set - multi-select chips, defaults to everything on
-let activeLevels = new Set(ALL_LEVELS);
+// active level filter set - multi-select chips. Empty = no filter, show
+// every level. Clicking a chip narrows the view down to just the level(s)
+// selected (click Error + Critical to see both together), rather than
+// starting "everything on" and having clicks subtract from that.
+let activeLevels = new Set();
 
 // ---------------- Theme management ----------------
 function toggleTheme() {
@@ -111,6 +114,8 @@ async function login(event) {
             LOGIN_PAGE.classList.add('hidden');
             DASHBOARD.classList.remove('hidden');
             loadContainers();
+            loadAlertAvailability();
+            loadAlertSettings();
             fetchPage(1);
             initWebSocket();
         } else {
@@ -265,6 +270,12 @@ function renderContainerOptions() {
     if (names.includes(current) || current === 'all') {
         containerFilterEl.value = current;
     }
+
+    // active-containers stat reads knownContainers directly - keep it in
+    // sync any time this set changes, not just whenever updateStats()
+    // next happens to run
+    const activeContainersEl = document.getElementById('active-containers');
+    if (activeContainersEl) activeContainersEl.textContent = knownContainers.size;
 }
 
 function noteContainer(name) {
@@ -275,12 +286,133 @@ function noteContainer(name) {
     renderContainerOptions();
 }
 
+// ---------------- Alerts configuration ----------------
+let alertAvailability = { slack: false, gmail: false };
+
+async function loadAlertAvailability() {
+    try {
+        const res = await fetch('/api/alerts/availability');
+        alertAvailability = await res.json();
+        renderAlertAvailabilityWarning();
+    } catch (err) {
+        console.log('failed to load alert availability', err);
+    }
+}
+
+async function loadAlertSettings() {
+    try {
+        const res = await fetch('/api/alerts/settings');
+        const settings = await res.json();
+        if (settings.channel) {
+            document.getElementById('alert-channel').value = settings.channel;
+        }
+        document.getElementById('alert-min-level').value = settings.min_level || 'ERROR';
+        document.getElementById('alert-enabled').checked = !!settings.enabled;
+        updateAlertStatusBadge(!!settings.enabled);
+        renderAlertAvailabilityWarning();
+    } catch (err) {
+        console.log('failed to load alert settings', err);
+    }
+}
+
+function renderAlertAvailabilityWarning() {
+    const channelEl = document.getElementById('alert-channel');
+    const warningEl = document.getElementById('alert-warning');
+    if (!channelEl || !warningEl) return;
+
+    const channel = channelEl.value;
+    if (!alertAvailability[channel]) {
+        const envHint = channel === 'slack'
+            ? 'APIWATCH_SLACK_WEBHOOK_URL is not set on the container.'
+            : 'APIWATCH_GMAIL_USER / APIWATCH_GMAIL_APP_PASSWORD are not set on the container.';
+        const label = channel === 'slack' ? 'Slack' : 'Gmail';
+        warningEl.textContent = `${label} isn't configured yet. ${envHint}`;
+        warningEl.classList.remove('hidden');
+    } else {
+        warningEl.classList.add('hidden');
+    }
+}
+
+function onAlertChannelChange() {
+    renderAlertAvailabilityWarning();
+}
+
+function updateAlertStatusBadge(enabled) {
+    const badge = document.getElementById('alerts-status-badge');
+    if (!badge) return;
+    badge.textContent = enabled ? 'Enabled' : 'Disabled';
+    badge.classList.toggle('enabled', !!enabled);
+
+    // the alerts card's left accent bar goes green ("armed") when alerts
+    // are actually on, same visual language as the other stat cards
+    const card = document.getElementById('alert-card');
+    if (card) card.classList.toggle('enabled', !!enabled);
+}
+
+async function saveAlertSettings() {
+    const channel = document.getElementById('alert-channel').value;
+    const min_level = document.getElementById('alert-min-level').value;
+    const enabled = document.getElementById('alert-enabled').checked;
+
+    if (enabled && !alertAvailability[channel]) {
+        alert(`Can't enable ${channel === 'slack' ? 'Slack' : 'Gmail'} alerts, that channel isn't configured on the server yet.`);
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/alerts/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channel, min_level, enabled })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            alert(err.error || 'Failed to save alert settings');
+            return;
+        }
+        const data = await res.json().catch(() => ({}));
+        updateAlertStatusBadge(enabled);
+        showAlertFlash(data.status === 'saved' ? 'Saved' : 'Done');
+    } catch (err) {
+        console.log('failed to save alert settings', err);
+    }
+}
+
+// small self-dismissing confirmation next to the Save button - no modal,
+// no alert(), just a quiet fade in/out so it doesn't demand attention
+let alertFlashTimer = null;
+function showAlertFlash(text) {
+    const el = document.getElementById('alert-save-flash');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.add('show');
+    if (alertFlashTimer) clearTimeout(alertFlashTimer);
+    alertFlashTimer = setTimeout(() => {
+        el.classList.remove('show');
+    }, 2000);
+}
+
+let searchDebounceTimer = null;
+function onSearchInput() {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    // debounce so we're not hitting the db on every keystroke, only once
+    // typing pauses, this now searches every log in the db, not just
+    // whatever page happens to be loaded client-side
+    searchDebounceTimer = setTimeout(() => {
+        fetchPage(1);
+    }, 300);
+}
+
 // ---------------- Pagination ----------------
 async function fetchPage(page) {
     if (loadingPage) return;
     loadingPage = true;
 
-    const res = await fetch(`/api/history?page=${page}&limit=${pageLimit}`);
+    const search = searchInputEl ? searchInputEl.value.trim() : '';
+    const params = new URLSearchParams({ page, limit: pageLimit });
+    if (search) params.set('search', search);
+
+    const res = await fetch(`/api/history?${params.toString()}`);
     if (res.status === 401) {
         loadingPage = false;
         handleSessionExpired();
@@ -326,7 +458,13 @@ function escapeHtml(str) {
 // built as one unbroken line with no template-literal line breaks inside it.
 // Only the .json-children wrapper (indentation via margin-left) should ever
 // introduce structural nesting/whitespace.
-function renderJsonNode(value, keyLabel, depth) {
+//
+// `term` is the active search term, threaded through recursively so string
+// values anywhere in the tree get the same highlighting the collapsed row
+// preview already had - previously this only escaped values and never knew
+// what was searched for, so a match buried inside an expanded JSON payload
+// was invisible even though it's the reason that row matched at all.
+function renderJsonNode(value, keyLabel, depth, term) {
     const keyHtml = keyLabel !== null
         ? `<span class="json-key">"${escapeHtml(keyLabel)}"</span>: `
         : '';
@@ -341,7 +479,7 @@ function renderJsonNode(value, keyLabel, depth) {
         return `<div class="json-line">${keyHtml}<span class="json-number">${value}</span></div>`;
     }
     if (typeof value === 'string') {
-        return `<div class="json-line">${keyHtml}<span class="json-string">"${escapeHtml(value)}"</span></div>`;
+        return `<div class="json-line">${keyHtml}<span class="json-string">"${highlightMatch(value, term)}"</span></div>`;
     }
 
     const isArray = Array.isArray(value);
@@ -352,19 +490,19 @@ function renderJsonNode(value, keyLabel, depth) {
     }
 
     const childrenHtml = entries
-        .map(([k, v]) => renderJsonNode(v, isArray ? null : k, depth + 1))
+        .map(([k, v]) => renderJsonNode(v, isArray ? null : k, depth + 1, term))
         .join('');
 
-    const openLine = `<div class="json-line"><span class="json-toggle" onclick="toggleJsonNode(this)">\u25BE</span>${keyHtml}<span class="json-bracket">${isArray ? '[' : '{'}</span><span class="json-count">${entries.length} item${entries.length !== 1 ? 's' : ''}</span></div>`;
+    const openLine = `<div class="json-line json-open" onclick="toggleJsonNode(this)"><span class="json-toggle">\u25BE</span>${keyHtml}<span class="json-bracket">${isArray ? '[' : '{'}</span><span class="json-count">${entries.length} item${entries.length !== 1 ? 's' : ''}</span></div>`;
     const closeLine = `<div class="json-line json-close"><span class="json-bracket">${isArray ? ']' : '}'}</span></div>`;
 
     return `<div class="json-node">${openLine}<div class="json-children">${childrenHtml}</div>${closeLine}</div>`;
 }
 
-function toggleJsonNode(toggleEl) {
-    const node = toggleEl.closest('.json-node');
+function toggleJsonNode(clickedEl) {
+    const node = clickedEl.closest('.json-node');
     if (!node) {
-        console.error('toggleJsonNode: no .json-node ancestor found for', toggleEl);
+        console.error('toggleJsonNode: no .json-node ancestor found for', clickedEl);
         return;
     }
 
@@ -382,20 +520,23 @@ function toggleJsonNode(toggleEl) {
     }
 
     const isCollapsed = children.classList.toggle('collapsed');
-    toggleEl.textContent = isCollapsed ? '\u25B8' : '\u25BE';
+    const icon = clickedEl.classList.contains('json-toggle')
+        ? clickedEl
+        : clickedEl.querySelector('.json-toggle');
+    if (icon) icon.textContent = isCollapsed ? '\u25B8' : '\u25BE';
 }
 
-function renderDetailContent(text) {
+function renderDetailContent(text, term) {
     if (!text) return '';
     try {
         const parsed = JSON.parse(text);
         if (parsed !== null && typeof parsed === 'object') {
-            return `<div class="json-tree">${renderJsonNode(parsed, null, 0)}</div>`;
+            return `<div class="json-tree">${renderJsonNode(parsed, null, 0, term)}</div>`;
         }
     } catch (e) {
         // not JSON, fall through to plain text
     }
-    return `<pre>${escapeHtml(text)}</pre>`;
+    return `<pre>${highlightMatch(text, term)}</pre>`;
 }
 
 function findRequestById(id) {
@@ -537,8 +678,8 @@ function renderRequest(req) {
                 <span class="timestamp">${timeLabel}</span>
             </div>
             <div class="request-details ${expandedSet.has(req.id) ? 'open' : ''}">
-                ${req.logger ? `<div class="detail-section"><div class="detail-label-row"><span class="detail-label">Logger</span><button class="copy-btn" onclick="copyDetailField('${req.id}', 'logger', this)">Copy</button></div><div class="detail-content"><pre>${escapeHtml(req.logger)}</pre></div></div>` : ''}
-                ${req.raw ? `<div class="detail-section"><div class="detail-label-row"><span class="detail-label">Raw Line</span><button class="copy-btn" onclick="copyDetailField('${req.id}', 'raw', this)">Copy</button></div><div class="detail-content">${renderDetailContent(req.raw)}</div></div>` : ''}
+                ${req.logger ? `<div class="detail-section"><div class="detail-label-row"><span class="detail-label">Logger</span><button class="copy-btn" onclick="copyDetailField('${req.id}', 'logger', this)">Copy</button></div><div class="detail-content"><pre>${highlightMatch(req.logger, term)}</pre></div></div>` : ''}
+                ${req.raw ? `<div class="detail-section"><div class="detail-label-row"><span class="detail-label">Raw Line</span><button class="copy-btn" onclick="copyDetailField('${req.id}', 'raw', this)">Copy</button></div><div class="detail-content">${renderDetailContent(req.raw, term)}</div></div>` : ''}
             </div>
         </div>`;
 }
@@ -568,7 +709,7 @@ function passesFilters(req) {
     const term = searchInputEl ? searchInputEl.value.trim().toLowerCase() : '';
     const level = req.level || 'UNKNOWN';
 
-    const levelMatch = activeLevels.has(level);
+    const levelMatch = activeLevels.size === 0 || activeLevels.has(level);
     const containerMatch = containerFilter === 'all' || req.container_name === containerFilter;
     const text = (req.message || req.raw || '').toLowerCase();
     const searchMatch = !term || text.includes(term);
@@ -631,11 +772,13 @@ function updateStats() {
     const errorRate = stats.total > 0 ? Math.round((stats.errors / stats.total) * 100) : 0;
     document.getElementById('error-rate').textContent = errorRate + '%';
 
-    // distinct containers within the currently loaded window, this is
-    // an approximation of "active", we don't have a live container list
-    // to compare against here, only what's shown up in logs so far
-    const containersInView = new Set(allRequests.map(r => r.container_name).filter(Boolean));
-    document.getElementById('active-containers').textContent = containersInView.size;
+    // knownContainers is populated from /api/containers plus anything new
+    // seen live - the same source the Container filter dropdown uses, so
+    // this number now always matches what that dropdown lists. Previously
+    // this counted only containers present in the currently loaded page,
+    // which disagreed with the dropdown whenever the page was filtered
+    // or just didn't happen to include every container.
+    document.getElementById('active-containers').textContent = knownContainers.size;
 
     updateCharts();
 }
@@ -678,23 +821,36 @@ if (pageSizeInitEl) {
 }
 
 async function checkAuthAndInit() {
+    const loadingEl = document.getElementById('app-loading');
+
     if (localStorage.getItem('auth') !== 'true') {
-        return; // stay on login page
+        // no stored session at all - go straight to login, no fetch
+        // needed so there's nothing to wait on
+        if (loadingEl) loadingEl.classList.add('hidden');
+        LOGIN_PAGE.classList.remove('hidden');
+        return;
     }
+
     try {
         const res = await fetch('/api/me');
         if (!res.ok) {
             // cookie expired or was never valid, stale localStorage flag
             localStorage.removeItem('auth');
+            if (loadingEl) loadingEl.classList.add('hidden');
+            LOGIN_PAGE.classList.remove('hidden');
             return;
         }
-        LOGIN_PAGE.classList.add('hidden');
+        if (loadingEl) loadingEl.classList.add('hidden');
         DASHBOARD.classList.remove('hidden');
         loadContainers();
+        loadAlertAvailability();
+        loadAlertSettings();
         fetchPage(1);
         initWebSocket();
     } catch (err) {
         console.log('auth check failed', err);
+        if (loadingEl) loadingEl.classList.add('hidden');
+        LOGIN_PAGE.classList.remove('hidden');
     }
 }
 

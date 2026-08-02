@@ -385,7 +385,7 @@ body {
 /* ---------------- Stats ---------------- */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 15px;
     margin-bottom: 20px;
 }
@@ -396,6 +396,11 @@ body {
     border-left: 2px solid var(--accent);
     border-radius: 4px;
     padding: 15px;
+    transition: border-color 0.2s, transform 0.15s;
+}
+
+.stat-card:hover {
+    transform: translateY(-1px);
 }
 
 .stat-label {
@@ -627,6 +632,15 @@ body {
     font-size: 12px;
 }
 
+/* covers both the JSON tree and the plain-text <pre> fallback, since both
+   always render inside .detail-content - one rule keeps expanded-view
+   highlighting visually identical to the collapsed row's .message mark */
+.detail-content mark {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-radius: 2px;
+}
+
 /* ---------------- JSON tree ---------------- */
 .json-tree {
     font-family: var(--font-mono);
@@ -712,6 +726,11 @@ body {
     opacity: 0.8;
 }
 
+.fund-link {
+    color: var(--accent);
+    font-weight: 600;
+}
+
 .footer {
     position: fixed;
     bottom: 0;
@@ -726,7 +745,148 @@ body {
     font-family: var(--font-mono);
 }
 
+/* ---------------- Alerts card ---------------- */
+.alert-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    justify-content: flex-start;
+}
+
+/* armed state - green accent bar, same visual language as the other
+   stat cards reacting to their own numbers */
+.alert-card.enabled {
+    border-left-color: var(--success-text);
+}
+
+.alert-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.alert-card-controls {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.alert-card-controls .select {
+    flex: 1;
+    min-width: 90px;
+    padding: 5px 7px;
+    font-size: 11px;
+}
+
+.alert-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.alert-save-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* quiet confirmation, not a popup - fades in place next to the button
+   and dismisses itself, no color flash, no motion beyond a 2px settle */
+.alert-save-flash {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--success-text);
+    opacity: 0;
+    transform: translateY(2px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+}
+
+.alert-save-flash.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.btn-sm {
+    padding: 4px 10px;
+    font-size: 11px;
+}
+
+/* deliberately calmer than the default .btn hover - a small opacity
+   shift instead of swapping background/border/text color all at once */
+.btn-sm:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--border);
+    color: var(--text-primary);
+    opacity: 0.85;
+}
+
+.alerts-status-badge {
+    padding: 3px 9px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.alerts-status-badge.enabled {
+    background: var(--success-bg);
+    color: var(--success-text);
+}
+
+.alert-enable-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-family: var(--font-ui);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.alert-enable-label input[type="checkbox"] {
+    cursor: pointer;
+    accent-color: var(--accent);
+}
+
+.alert-warning {
+    padding: 7px 9px;
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    font-size: 10px;
+    font-family: var(--font-mono);
+    border-radius: 3px;
+    line-height: 1.4;
+}
+
 /* ---------------- Login page ---------------- */
+.app-loading {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: var(--bg-primary);
+}
+
+.app-loading-mark {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+}
+
 .login-container {
     height: 100vh;
     display: flex;

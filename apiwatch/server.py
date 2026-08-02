@@ -16,6 +16,7 @@ from collections import deque
 from .ui import template
 from utils.db_sqlite import AsyncDB
 from .docker_collector import DockerCollector
+from .alerting import AlertManager
 
 SESSION_COOKIE_NAME = 'apiwatch_session'
 SESSION_TTL_SECONDS = int(os.getenv('APIWATCH_SESSION_TTL_SECONDS', str(24 * 3600)))
@@ -45,7 +46,10 @@ class DashboardServer:
         self.runner = None
         db_path = Path(__file__).parent.parent / 'data' / 'apiwatch.db'
         self.db = AsyncDB(db_path)
+        # DockerCollector never touches db.init() itself, it just uses
+        # this same connection once we've initialized it in start()
         self.collector = DockerCollector(db=self.db, broadcast=self.broadcast)
+        self.alerts = AlertManager(db=self.db)
     
     @web.middleware
     async def auth_middleware(self, request, handler):
@@ -63,6 +67,11 @@ class DashboardServer:
 
     async def broadcast(self, data: dict):
         """Push a record to every connected dashboard websocket client."""
+        # fire-and-forget: alerting must never slow down or block the
+        # live dashboard stream, a slow Slack/Gmail call shouldn't add
+        # latency to what every connected browser sees
+        asyncio.create_task(self.alerts.maybe_alert(data))
+
         if not self.ws_clients:
             return
         message = json.dumps(data)
@@ -155,8 +164,9 @@ class DashboardServer:
     async def api_history_handler(self, request):
         page = int(request.query.get("page", 1))
         limit = int(request.query.get("limit", 20))
+        search = request.query.get("search", "").strip() or None
 
-        logs = await self.db.get_logs_paginated(page, limit)
+        logs = await self.db.get_logs_paginated(page, limit, search=search)
         return web.json_response({
             "page": page,
             "limit": limit,
@@ -177,6 +187,41 @@ class DashboardServer:
         containers = await self.db.get_container_stats()
         levels = await self.db.get_level_counts()
         return web.json_response({"containers": containers, "levels": levels})
+
+    async def api_alerts_availability_handler(self, request):
+        """
+        Which channels actually have credentials configured via env
+        vars, the UI uses this to grey out / warn on a channel before
+        the user tries to enable something that can't actually send.
+        """
+        return web.json_response(self.alerts.availability())
+
+    async def api_alerts_settings_get_handler(self, request):
+        settings = await self.db.get_alert_settings()
+        if not settings:
+            return web.json_response({'channel': None, 'min_level': 'ERROR', 'enabled': False})
+        return web.json_response({
+            'channel': settings.get('channel'),
+            'min_level': settings.get('min_level', 'ERROR'),
+            'enabled': bool(settings.get('enabled')),
+        })
+
+    async def api_alerts_settings_post_handler(self, request):
+        data = await request.json()
+        channel = data.get('channel')
+        min_level = data.get('min_level', 'ERROR')
+        enabled = bool(data.get('enabled'))
+
+        if enabled and channel not in ('slack', 'gmail'):
+            return web.json_response({'error': 'channel must be slack or gmail'}, status=400)
+
+        if enabled and not self.alerts.availability().get(channel):
+            return web.json_response({
+                'error': f'{channel} is not configured, missing required env vars'
+            }, status=400)
+
+        await self.db.save_alert_settings(channel, min_level, enabled)
+        return web.json_response({'status': 'saved'})
     
     async def api_clear_handler(self, request):
         """Clear history"""
@@ -191,6 +236,7 @@ class DashboardServer:
 
         BASE_DIR = Path(__file__).parent / 'ui'
         self.app.router.add_static('/static', path=BASE_DIR, name='static')
+        print(f'base dir:{BASE_DIR}')
         self.app.router.add_get('/', self.dashboard_handler)
         self.app.router.add_get('/ws', self.websocket_handler)
         self.app.router.add_post('/auth', self.get_auth_credentials)
@@ -199,6 +245,9 @@ class DashboardServer:
         self.app.router.add_get('/api/history', self.api_history_handler)
         self.app.router.add_get('/api/containers', self.api_containers_handler)
         self.app.router.add_get('/api/stats', self.api_stats_handler)
+        self.app.router.add_get('/api/alerts/availability', self.api_alerts_availability_handler)
+        self.app.router.add_get('/api/alerts/settings', self.api_alerts_settings_get_handler)
+        self.app.router.add_post('/api/alerts/settings', self.api_alerts_settings_post_handler)
         self.app.router.add_post('/api/clear', self.api_clear_handler)
         
         self.runner = web.AppRunner(self.app)
@@ -211,7 +260,7 @@ class DashboardServer:
         await self.collector.start()
         asyncio.create_task(self._session_cleanup_loop())
         
-        # print(f"[ApiWatchdog] Dashboard started at http://{self.host}:{self.port}")
+        print(f"[ApiWatchdog] Dashboard started at http://{self.host}:{self.port}")
     
     async def stop(self):
         """Stop the server"""
@@ -269,7 +318,6 @@ def start_dashboard_server(host='0.0.0.0', port=22222, username='admin', passwor
         time.sleep(0.5)
         
         return thread
-
 
 # For standalone mode
 async def run_standalone(host='0.0.0.0', port=22222, username='admin', password='admin'):
