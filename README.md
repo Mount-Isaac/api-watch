@@ -87,24 +87,18 @@ http://localhost:22222
 ### Docker Compose
 
 ```yaml
+
+
 services:
   apiwatch:
-    image: theisaac/api-watch:latest
-    container_name: apiwatch
-    networks:
-      - test-network
+    image: theisaac/api-watch:v2
     ports:
       - "22222:22222"
     restart: unless-stopped
     environment:
-      - PYTHONUNBUFFERED=1
-      - WATCHDOG_USERNAME=admin
-      - WATCHDOG_PASSWORD=admin
-      - API_WATCH_DASHBOARD_HOST=0.0.0.
-      - API_WATCH_DASHBOARD_PORT=22222
+      - API_WATCH_MAX_HISTORY=3000
     volumes:
-      - data:/app/data
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: python -m apiwatch
+    - ./data:/app/data
+    - /var/run/docker.sock:/var/run/docker.sock
 ```
 ---

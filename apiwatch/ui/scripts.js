@@ -20,7 +20,7 @@ let stats = {
 let knownContainers = new Set();
 let all_requests_count = 0;
 let currentPage = 1;
-let pageLimit = 10;
+let pageLimit = 100;
 let loadingPage = false;
 
 // ---------------- Theme management ----------------
@@ -66,6 +66,9 @@ async function login(event) {
         const auth_response = await res.json();
 
         if (auth_response.message === "success") {
+            // the real session lives in an httponly cookie the server just
+            // set, this flag is only so we don't flash the login page on
+            // next reload, /api/me is what actually verifies the cookie
             localStorage.setItem('auth', 'true');
             ERROR_EL.classList.add('hidden');
             usernameInput.classList.remove('error');
@@ -91,7 +94,23 @@ async function login(event) {
     }
 }
 
-function logout() {
+function handleSessionExpired() {
+    // session died mid-use (TTL expiry, server restart cleared it), drop
+    // back to the login page without hitting /api/logout, there's no
+    // valid session left to invalidate
+    localStorage.removeItem('auth');
+    if (ws) ws.close();
+    DASHBOARD.classList.add('hidden');
+    LOGIN_PAGE.classList.remove('hidden');
+}
+
+async function logout() {
+    try {
+        await fetch('/api/logout', { method: 'POST' });
+    } catch (err) {
+        console.log('logout request failed', err);
+    }
+
     localStorage.removeItem('auth');
     DASHBOARD.classList.add('hidden');
     LOGIN_PAGE.classList.remove('hidden');
@@ -110,16 +129,45 @@ function logout() {
 }
 
 // ---------------- WebSocket ----------------
+let wsReconnectAttempts = 0;
+let wsReconnectTimer = null;
+
 function initWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${protocol}//${window.location.hostname}:${window.location.port}/ws`);
+
+    ws.onopen = () => {
+        wsReconnectAttempts = 0;
+    };
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         addRequest(data);
     };
 
-    ws.onclose = () => console.log('WebSocket disconnected');
+    ws.onclose = () => {
+        console.log('WebSocket disconnected, reconnecting...');
+        scheduleReconnect();
+    };
+
+    ws.onerror = () => {
+        ws.close();
+    };
+}
+
+function scheduleReconnect() {
+    if (wsReconnectTimer) return;
+    // capped exponential backoff: 1s, 2s, 4s, ... up to 30s, so a
+    // restarting apiwatch container or nginx reload doesn't get
+    // hammered with reconnect attempts
+    const delay = Math.min(1000 * (2 ** wsReconnectAttempts), 30000);
+    wsReconnectAttempts++;
+    wsReconnectTimer = setTimeout(() => {
+        wsReconnectTimer = null;
+        if (localStorage.getItem('auth') === 'true') {
+            initWebSocket();
+        }
+    }, delay);
 }
 
 // ---------------- Containers filter ----------------
@@ -161,6 +209,11 @@ async function fetchPage(page) {
     loadingPage = true;
 
     const res = await fetch(`/api/history?page=${page}&limit=${pageLimit}`);
+    if (res.status === 401) {
+        loadingPage = false;
+        handleSessionExpired();
+        return;
+    }
     const result = await res.json();
 
     currentPage = result.page;
@@ -337,10 +390,25 @@ async function clearRequests() {
 // ---------------- Initialize ----------------
 loadTheme();
 
-if (localStorage.getItem('auth') === 'true') {
-    LOGIN_PAGE.classList.add('hidden');
-    DASHBOARD.classList.remove('hidden');
-    loadContainers();
-    fetchPage(1);
-    initWebSocket();
+async function checkAuthAndInit() {
+    if (localStorage.getItem('auth') !== 'true') {
+        return; // stay on login page
+    }
+    try {
+        const res = await fetch('/api/me');
+        if (!res.ok) {
+            // cookie expired or was never valid, stale localStorage flag
+            localStorage.removeItem('auth');
+            return;
+        }
+        LOGIN_PAGE.classList.add('hidden');
+        DASHBOARD.classList.remove('hidden');
+        loadContainers();
+        fetchPage(1);
+        initWebSocket();
+    } catch (err) {
+        console.log('auth check failed', err);
+    }
 }
+
+checkAuthAndInit();

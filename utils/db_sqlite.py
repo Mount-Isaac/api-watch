@@ -48,6 +48,17 @@ class AsyncDB:
             );
             ''')
 
+            # sessions, this is what makes auth real: every protected
+            # route checks a token against this table instead of trusting
+            # whatever the browser's localStorage claims
+            await db.execute('''
+            CREATE TABLE IF NOT EXISTS sessions (
+                token TEXT PRIMARY KEY,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                expires_at INTEGER NOT NULL
+            );
+            ''')
+
             await db.execute(
                 'CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON container_logs(timestamp)'
             )
@@ -180,6 +191,75 @@ class AsyncDB:
             )
             rows = await cur.fetchall()
             return [r[0] for r in rows]
+
+    async def get_container_stats(self) -> List[Dict]:
+        """
+        Per-container summary: how much it's logged, how much of that
+        was errors, and when it was first/last seen. Powers the
+        containers panel, one row per container regardless of whether
+        it's still running.
+        """
+        query = """
+            SELECT
+                container_name,
+                COUNT(*) AS log_count,
+                SUM(CASE WHEN level IN ('ERROR', 'CRITICAL') THEN 1 ELSE 0 END) AS error_count,
+                MIN(timestamp) AS first_seen,
+                MAX(timestamp) AS last_seen
+            FROM container_logs
+            WHERE container_name IS NOT NULL
+            GROUP BY container_name
+            ORDER BY last_seen DESC
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(query)
+            rows = await cur.fetchall()
+            return [dict(row) for row in rows]
+
+    async def get_level_counts(self) -> Dict[str, int]:
+        """Total count per level, across all logs, for the breakdown chart."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cur = await db.execute(
+                'SELECT level, COUNT(*) FROM container_logs GROUP BY level'
+            )
+            rows = await cur.fetchall()
+            return {row[0] or 'UNKNOWN': row[1] for row in rows}
+
+    # ---- sessions (auth) ----
+
+    async def create_session(self, token: str, expires_at: int):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                'INSERT INTO sessions (token, expires_at) VALUES (?, ?)',
+                (token, expires_at)
+            )
+            await db.commit()
+
+    async def session_valid(self, token: Optional[str]) -> bool:
+        if not token:
+            return False
+        async with aiosqlite.connect(self.db_path) as db:
+            cur = await db.execute(
+                'SELECT expires_at FROM sessions WHERE token = ?', (token,)
+            )
+            row = await cur.fetchone()
+            if not row:
+                return False
+            return row[0] > int(time.time())
+
+    async def delete_session(self, token: str):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('DELETE FROM sessions WHERE token = ?', (token,))
+            await db.commit()
+
+    async def cleanup_expired_sessions(self):
+        async with aiosqlite.connect(self.db_path) as db:
+            cur = await db.execute(
+                'DELETE FROM sessions WHERE expires_at < ?', (int(time.time()),)
+            )
+            await db.commit()
+            return cur.rowcount
 
     # ---- checkpoint state (for restart-safe streaming) ----
 

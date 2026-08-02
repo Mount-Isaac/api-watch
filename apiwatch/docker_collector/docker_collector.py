@@ -110,7 +110,7 @@ class DockerCollector:
         """Call this from server.py's start(), after db.init() has run."""
         if self._running:
             return
-        self.docker = aiodocker.Docker(url="unix:///var/run/docker.sock")
+        self.docker = aiodocker.Docker()
         self._running = True
         self._poll_task = asyncio.create_task(self._poll_loop())
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())

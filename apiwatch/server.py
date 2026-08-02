@@ -4,6 +4,9 @@ Checks if dashboard is running, starts if not
 """
 import json
 import os
+import hmac
+import secrets
+import time
 from pathlib import Path
 import threading
 import asyncio
@@ -12,7 +15,13 @@ from aiohttp import web
 from collections import deque
 from .ui import template
 from utils.db_sqlite import AsyncDB
-from ._docker.docker_collector import DockerCollector
+from .docker_collector import DockerCollector
+
+SESSION_COOKIE_NAME = 'apiwatch_session'
+SESSION_TTL_SECONDS = int(os.getenv('APIWATCH_SESSION_TTL_SECONDS', str(24 * 3600)))
+# paths reachable without a valid session, everything else is gated
+PUBLIC_PATHS = {'/', '/auth'}
+PUBLIC_PREFIXES = ('/static/',)
 
 
 
@@ -36,10 +45,22 @@ class DashboardServer:
         self.runner = None
         db_path = Path(__file__).parent.parent / 'data' / 'apiwatch.db'
         self.db = AsyncDB(db_path)
-        # DockerCollector never touches db.init() itself, it just uses
-        # this same connection once we've initialized it in start()
         self.collector = DockerCollector(db=self.db, broadcast=self.broadcast)
     
+    @web.middleware
+    async def auth_middleware(self, request, handler):
+        path = request.path
+        if path in PUBLIC_PATHS or path.startswith(PUBLIC_PREFIXES):
+            return await handler(request)
+
+        token = request.cookies.get(SESSION_COOKIE_NAME)
+        if not await self.db.session_valid(token):
+            raise web.HTTPUnauthorized(
+                text=json.dumps({'error': 'unauthorized'}),
+                content_type='application/json'
+            )
+        return await handler(request)
+
     async def broadcast(self, data: dict):
         """Push a record to every connected dashboard websocket client."""
         if not self.ws_clients:
@@ -83,13 +104,53 @@ class DashboardServer:
     async def get_auth_credentials(self, request, **kwargs):
         data = await request.json()
 
+        submitted_user = data.get('username', '')
+        submitted_pass = data.get('password', '')
+        # timing-safe comparison, a plain == leaks how many leading
+        # characters matched via response time, small thing but free
+        # to do right
         is_match = (
-            data.get('username') == self.username and 
-            data.get('password') == self.password
+            hmac.compare_digest(submitted_user, self.username) and
+            hmac.compare_digest(submitted_pass, self.password)
         )
-        auth_response = { 'message': 'success' } if is_match else { 'message': 'Invalid credentials.' }
-        
-        return web.json_response(auth_response)
+
+        if not is_match:
+            return web.json_response({'message': 'Invalid credentials.'}, status=401)
+
+        token = secrets.token_urlsafe(32)
+        expires_at = int(time.time()) + SESSION_TTL_SECONDS
+        await self.db.create_session(token, expires_at)
+
+        resp = web.json_response({'message': 'success'})
+        resp.set_cookie(
+            SESSION_COOKIE_NAME, token,
+            httponly=True, samesite='Strict', max_age=SESSION_TTL_SECONDS
+        )
+        return resp
+
+    async def api_logout_handler(self, request):
+        token = request.cookies.get(SESSION_COOKIE_NAME)
+        if token:
+            await self.db.delete_session(token)
+        resp = web.json_response({'status': 'logged out'})
+        resp.del_cookie(SESSION_COOKIE_NAME)
+        return resp
+
+    async def api_me_handler(self, request):
+        """Lightweight check the frontend calls on load, cookie already
+        got validated by auth_middleware just to reach this handler, so
+        getting here at all means the session is good."""
+        return web.json_response({'authenticated': True})
+
+    async def _session_cleanup_loop(self):
+        while True:
+            await asyncio.sleep(3600)
+            try:
+                removed = await self.db.cleanup_expired_sessions()
+                if removed:
+                    print(f'[ApiWatchdog] cleaned up {removed} expired sessions')
+            except Exception as exc:
+                print(f'[ApiWatchdog] session cleanup failed: {exc}')
 
     async def api_history_handler(self, request):
         page = int(request.query.get("page", 1))
@@ -110,6 +171,12 @@ class DashboardServer:
         """
         containers = await self.db.get_distinct_containers()
         return web.json_response({"containers": containers})
+
+    async def api_stats_handler(self, request):
+        """Per-container summary + level breakdown, across all logs."""
+        containers = await self.db.get_container_stats()
+        levels = await self.db.get_level_counts()
+        return web.json_response({"containers": containers, "levels": levels})
     
     async def api_clear_handler(self, request):
         """Clear history"""
@@ -118,18 +185,20 @@ class DashboardServer:
     
     async def start(self):
         """Start the dashboard server"""
-        self.app = web.Application()
+        self.app = web.Application(middlewares=[self.auth_middleware])
         await self.db.init()
         self.history = await self.db.get_all_logs()
 
         BASE_DIR = Path(__file__).parent / 'ui'
         self.app.router.add_static('/static', path=BASE_DIR, name='static')
-        print(f'base dir:{BASE_DIR}')
         self.app.router.add_get('/', self.dashboard_handler)
         self.app.router.add_get('/ws', self.websocket_handler)
         self.app.router.add_post('/auth', self.get_auth_credentials)
+        self.app.router.add_post('/api/logout', self.api_logout_handler)
+        self.app.router.add_get('/api/me', self.api_me_handler)
         self.app.router.add_get('/api/history', self.api_history_handler)
         self.app.router.add_get('/api/containers', self.api_containers_handler)
+        self.app.router.add_get('/api/stats', self.api_stats_handler)
         self.app.router.add_post('/api/clear', self.api_clear_handler)
         
         self.runner = web.AppRunner(self.app)
@@ -140,8 +209,9 @@ class DashboardServer:
         
         # db is initialized above, collector only starts once that's done
         await self.collector.start()
+        asyncio.create_task(self._session_cleanup_loop())
         
-        print(f"[ApiWatchdog] Dashboard started at http://{self.host}:{self.port}")
+        # print(f"[ApiWatchdog] Dashboard started at http://{self.host}:{self.port}")
     
     async def stop(self):
         """Stop the server"""
@@ -206,17 +276,28 @@ async def run_standalone(host='0.0.0.0', port=22222, username='admin', password=
     """Run dashboard as standalone server"""
     server = DashboardServer(host=host, port=port, username=username, password=password)
     await server.start()
-    
-    print("=" * 60)
-    print("ApiWatchdog Dashboard Server (Standalone Mode)")
-    print("=" * 60)
-    print(f"Dashboard: http://{host}:{port}")
-    print(f"WebSocket: ws://{host}:{port}/ws")
-    print(f"Docker collector: watching containers ({'all' if server.collector.watch_all else 'labelled'})")
-    print("=" * 60)
-    print("Waiting for container logs...")
-    print("=" * 60, end="\n\n")
-    
+
+
+    from textwrap import shorten
+
+    width = 72
+    line = "═" * width
+    version = os.getenv("version_number", "2.0.0")
+
+    print(f"\n╔{line}╗")
+    print(f"║{f'api-watch v{version} started':^{width}}║")
+    print(f"╠{line}╣")
+    print(f"║ Dashboard        : http://{host}:{port}".ljust(width + 1) + "║")
+    print(f"║ WebSocket        : ws://{host}:{port}/ws".ljust(width + 1) + "║")
+    print(
+        f"║ Docker Collector : {'Watching ALL containers' if server.collector.watch_all else 'Watching labelled containers'}"
+        .ljust(width + 1)
+        + "║"
+    )
+    print(f"╠{line}╣")
+    print(f"║ {'Waiting for container logs...':<{width-1}}║")
+    print(f"╚{line}╝\n")
+
     try:
         await asyncio.Event().wait()
     except KeyboardInterrupt:
