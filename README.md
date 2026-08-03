@@ -72,6 +72,22 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 ```
 
+## Target docker container (eg Backend)
+```yaml
+services:
+  backend:
+    image: registry.gitlab.com/org_name/repo_group/backend:latest
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    env_file:
+    - /opt/configs/.env
+    volumes:
+      - /var/logs/backend:/app/logs
+    labels:
+      - "apiwatch.collect=true"
+```
+
 ## Configuration
 
 All env vars are optional except credentials.
