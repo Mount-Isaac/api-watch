@@ -320,8 +320,6 @@ function updateAlertStatusBadge(slackEnabled, gmailEnabled) {
     badge.textContent = label;
     badge.classList.toggle('enabled', anyEnabled);
 
-    // armed state: green accent bar when any channel is on, same visual
-    // language as the other stat cards reacting to their own numbers
     const card = document.getElementById('alert-card');
     if (card) card.classList.toggle('enabled', anyEnabled);
 }

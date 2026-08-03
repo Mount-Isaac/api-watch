@@ -34,7 +34,7 @@ _server_lock = threading.Lock()
 class DashboardServer:
     """Centralized dashboard server"""
     
-    def __init__(self, host='0.0.0.0', port=22222, max_history=1000, username = "admin", password="password"):
+    def __init__(self, host='0.0.0.0', port=22222, max_history=1000, username = "admin", password="admin"):
         self.host = host
         self.port = port
         self.max_history = max_history
@@ -175,12 +175,28 @@ class DashboardServer:
 
     async def api_containers_handler(self, request):
         """
-        Distinct container names seen so far, including ones from
-        containers that have since stopped, their log rows persist so
-        the name stays filterable in the dashboard.
+        Union of two sources: containers currently running (queried live
+        from the collector, so one only emitting levels below an
+        APIWATCH_LOG_LEVELS/alert threshold still shows up immediately,
+        instead of waiting for a row to actually land in the db), and
+        containers with historical rows in the db (so one that's since
+        stopped stays filterable by its past logs). Deduped via a set,
+        converted back to a sorted list before returning since a raw
+        Python set isn't JSON-serializable, web.json_response would
+        throw the moment there was ever an actual overlap to dedupe.
         """
-        containers = await self.db.get_distinct_containers()
-        return web.json_response({"containers": containers})
+        containers = await self.collector._list_target_containers()
+        # _container_info does a `container.show()` call each, run them
+        # concurrently instead of one at a time in a comprehension
+        info_results = await asyncio.gather(
+            *[self.collector._container_info(c) for c in containers]
+        )
+        active_names = {name for name, _ in info_results}
+
+        db_names = set(await self.db.get_distinct_containers())
+
+        all_names = sorted(active_names | db_names)
+        return web.json_response({"containers": all_names})
 
     async def api_stats_handler(self, request):
         """Per-container summary + level breakdown, across all logs."""
@@ -234,6 +250,7 @@ class DashboardServer:
 
         BASE_DIR = Path(__file__).parent / 'ui'
         self.app.router.add_static('/static', path=BASE_DIR, name='static')
+        print(f'base dir:{BASE_DIR}')
         self.app.router.add_get('/', self.dashboard_handler)
         self.app.router.add_get('/ws', self.websocket_handler)
         self.app.router.add_post('/auth', self.get_auth_credentials)
@@ -314,7 +331,6 @@ def start_dashboard_server(host='0.0.0.0', port=22222, username='admin', passwor
         
         return thread
 
-# For standalone mode
 async def run_standalone(host='0.0.0.0', port=22222, username='admin', password='admin'):
     """Run dashboard as standalone server"""
     server = DashboardServer(host=host, port=port, username=username, password=password)

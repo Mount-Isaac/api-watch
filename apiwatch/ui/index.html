@@ -63,11 +63,13 @@
     <div id="dashboard" class="hidden">
       <div class="header">
         <div class="header-left">
-          <h1>api-watch<span class="cursor-bink"></span></h1>
+          <h1>api-watch<span class="cursor-blnk"></span></h1>
           <div class="status">
-            <div class="status-dot" id="status-dot"></div>
-            <span>Live</span>
-            <span>|</span>
+            <span class="status-live-indicator">
+              <span class="status-dot" id="status-dot"></span>
+              <span>Live</span>
+              <span>|</span>
+            </span>
             <span id="request-count">0 logs</span>
           </div>
         </div>
@@ -133,38 +135,41 @@
 
             <div class="alert-card-section">
               <div class="alert-card-section-label">Channels</div>
-              <label class="alert-toggle-row">
-                <span class="alert-toggle-name">Slack</span>
-                <span class="alert-toggle-switch-wrap">
-                  <input type="checkbox" id="alert-slack-enabled" class="alert-toggle-input" onchange="onAlertChannelToggle()" />
-                  <span class="alert-toggle-switch"></span>
-                </span>
-              </label>
-              <label class="alert-toggle-row">
-                <span class="alert-toggle-name">Gmail</span>
-                <span class="alert-toggle-switch-wrap">
-                  <input type="checkbox" id="alert-gmail-enabled" class="alert-toggle-input" onchange="onAlertChannelToggle()" />
-                  <span class="alert-toggle-switch"></span>
-                </span>
-              </label>
+              <div class="alert-toggle-inline-row">
+                <label class="alert-toggle-chip">
+                  <span class="alert-toggle-switch-wrap">
+                    <input type="checkbox" id="alert-slack-enabled" class="alert-toggle-input" onchange="onAlertChannelToggle()" />
+                    <span class="alert-toggle-switch"></span>
+                  </span>
+                  <span class="alert-toggle-chip-name">Slack</span>
+                </label>
+                <label class="alert-toggle-chip">
+                  <span class="alert-toggle-switch-wrap">
+                    <input type="checkbox" id="alert-gmail-enabled" class="alert-toggle-input" onchange="onAlertChannelToggle()" />
+                    <span class="alert-toggle-switch"></span>
+                  </span>
+                  <span class="alert-toggle-chip-name">Gmail</span>
+                </label>
+              </div>
             </div>
 
             <div class="alert-card-section">
               <div class="alert-card-section-label">Threshold</div>
-              <select class="select alert-card-select" id="alert-min-level">
-                <option value="CRITICAL">Critical only</option>
-                <option value="ERROR" selected>Error &amp; Critical</option>
-                <option value="WARNING">Warning &amp; above</option>
-              </select>
+              <div class="alert-card-threshold-row">
+                <select class="select alert-card-select" id="alert-min-level">
+                  <option value="CRITICAL">Critical only</option>
+                  <option value="ERROR" selected>Error &amp; Critical</option>
+                  <option value="WARNING">Warning &amp; above</option>
+                </select>
+                <button class="btn btn-sm alert-save-btn" onclick="saveAlertSettings()">Save</button>
+              </div>
+              <div class="alert-save-flash-wrap">
+                <span id="alert-save-flash" class="alert-save-flash">Saved</span>
+              </div>
             </div>
 
             <div id="alert-warning-slack" class="alert-warning hidden"></div>
             <div id="alert-warning-gmail" class="alert-warning hidden"></div>
-
-            <div class="alert-card-footer">
-              <span id="alert-save-flash" class="alert-save-flash">Saved</span>
-              <button class="btn btn-sm" onclick="saveAlertSettings()">Save</button>
-            </div>
           </div>
         </div>
 

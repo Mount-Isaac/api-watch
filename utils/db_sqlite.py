@@ -32,9 +32,16 @@ class AsyncDB:
                 logger TEXT,
                 message TEXT,
                 raw TEXT,
+                parsed_data TEXT,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             );
             ''')
+            # migration for dbs created before structured-data extraction,
+            # ADD COLUMN fails harmlessly if it already exists
+            try:
+                await db.execute("ALTER TABLE container_logs ADD COLUMN parsed_data TEXT")
+            except Exception:
+                pass
 
             # checkpoint state, one row per container, this is what
             # survives a restart so we know where to resume streaming
@@ -101,7 +108,7 @@ class AsyncDB:
         """Insert a single log record, returns the new total row count."""
         fields = [
             'id', 'container_id', 'container_name', 'service',
-            'level', 'logger', 'message', 'raw', 'timestamp'
+            'level', 'logger', 'message', 'raw', 'parsed_data', 'timestamp'
         ]
         values = [data.get(f) for f in fields]
 
@@ -129,7 +136,7 @@ class AsyncDB:
 
         fields = [
             'id', 'container_id', 'container_name', 'service',
-            'level', 'logger', 'message', 'raw', 'timestamp'
+            'level', 'logger', 'message', 'raw', 'parsed_data', 'timestamp'
         ]
         rows = [[data.get(f) for f in fields] for data in records]
 
