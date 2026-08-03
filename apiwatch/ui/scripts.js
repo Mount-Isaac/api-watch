@@ -15,9 +15,6 @@ const liveTailLabelEl = document.getElementById('live-tail-label');
 const LEVEL_RANK = { CRITICAL: 0, ERROR: 1, WARNING: 2, INFO: 3, DEBUG: 4, UNKNOWN: 5 };
 const ERROR_LEVELS = new Set(['CRITICAL', 'ERROR']);
 const ALL_LEVELS = ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'UNKNOWN'];
-// not an arithmetic range (10/20/30/50/100 has no constant step), so this
-// stays an explicit list - but it's the one place it's defined, and the
-// <select> is built from it instead of duplicating these values in HTML
 const PAGE_SIZES = [10, 20, 30, 50, 100];
 
 let expandedSet = new Set();
@@ -31,9 +28,6 @@ let stats = {
 let knownContainers = new Set();
 let all_requests_count = 0;
 let currentPage = 1;
-// rows-per-page: also doubles as the cap on the live-stream buffer (see
-// addRequest), so changing it affects both the paginated fetch size and
-// how many live rows are kept in memory before the oldest rolls off
 let pageLimit = parseInt(localStorage.getItem('pageLimit'), 10) || 20;
 let loadingPage = false;
 
@@ -41,24 +35,14 @@ function changePageSize() {
     const pageSizeEl = document.getElementById('page-size');
     pageLimit = parseInt(pageSizeEl.value, 10) || 20;
     localStorage.setItem('pageLimit', pageLimit);
-    // trim what's already in memory too, so a live buffer that was built
-    // up at the old size doesn't stay oversized until the next log arrives
     if (allRequests.length > pageLimit) {
         allRequests.length = pageLimit;
     }
     fetchPage(1);
 }
 
-// live-tail state: when paused, incoming ws messages are still recorded
-// (stats stay accurate) but not rendered until the user resumes, so a
-// busy stream doesn't yank a row they're mid-read on out from under them
 let isLive = true;
 let pendingNewCount = 0;
-
-// active level filter set - multi-select chips. Empty = no filter, show
-// every level. Clicking a chip narrows the view down to just the level(s)
-// selected (click Error + Critical to see both together), rather than
-// starting "everything on" and having clicks subtract from that.
 let activeLevels = new Set();
 
 // ---------------- Theme management ----------------
@@ -104,9 +88,6 @@ async function login(event) {
         const auth_response = await res.json();
 
         if (auth_response.message === "success") {
-            // the real session lives in an httponly cookie the server just
-            // set, this flag is only so we don't flash the login page on
-            // next reload, /api/me is what actually verifies the cookie
             localStorage.setItem('auth', 'true');
             ERROR_EL.classList.add('hidden');
             usernameInput.classList.remove('error');
@@ -135,9 +116,6 @@ async function login(event) {
 }
 
 function handleSessionExpired() {
-    // session died mid-use (TTL expiry, server restart cleared it), drop
-    // back to the login page without hitting /api/logout, there's no
-    // valid session left to invalidate
     localStorage.removeItem('auth');
     if (ws) ws.close();
     DASHBOARD.classList.add('hidden');
@@ -200,9 +178,6 @@ function initWebSocket() {
 
 function scheduleReconnect() {
     if (wsReconnectTimer) return;
-    // capped exponential backoff: 1s, 2s, 4s, ... up to 30s, so a
-    // restarting apiwatch container or nginx reload doesn't get
-    // hammered with reconnect attempts
     const delay = Math.min(1000 * (2 ** wsReconnectAttempts), 30000);
     wsReconnectAttempts++;
     wsReconnectTimer = setTimeout(() => {
@@ -235,8 +210,6 @@ function updateLiveTailUI() {
 }
 
 // ---------------- Container color coding ----------------
-// deterministic hash -> hue, so the same container name always gets the
-// same swatch color across reloads and across every logged-in user
 function containerColor(name) {
     if (!name) return 'transparent';
     let hash = 0;
@@ -266,22 +239,16 @@ function renderContainerOptions() {
     containerFilterEl.innerHTML = '<option value="all">All</option>' +
         names.map(name => `<option value="${name}">${name}</option>`).join('');
 
-    // keep whatever the user had selected, if it still exists
     if (names.includes(current) || current === 'all') {
         containerFilterEl.value = current;
     }
 
-    // active-containers stat reads knownContainers directly - keep it in
-    // sync any time this set changes, not just whenever updateStats()
-    // next happens to run
     const activeContainersEl = document.getElementById('active-containers');
     if (activeContainersEl) activeContainersEl.textContent = knownContainers.size;
 }
 
 function noteContainer(name) {
     if (!name || knownContainers.has(name)) return;
-    // a new container shows up mid-session, we add it, we never remove
-    // one just because it stopped, its past logs are still browsable
     knownContainers.add(name);
     renderContainerOptions();
 }
@@ -303,12 +270,10 @@ async function loadAlertSettings() {
     try {
         const res = await fetch('/api/alerts/settings');
         const settings = await res.json();
-        if (settings.channel) {
-            document.getElementById('alert-channel').value = settings.channel;
-        }
+        document.getElementById('alert-slack-enabled').checked = !!settings.slack_enabled;
+        document.getElementById('alert-gmail-enabled').checked = !!settings.gmail_enabled;
         document.getElementById('alert-min-level').value = settings.min_level || 'ERROR';
-        document.getElementById('alert-enabled').checked = !!settings.enabled;
-        updateAlertStatusBadge(!!settings.enabled);
+        updateAlertStatusBadge(!!settings.slack_enabled, !!settings.gmail_enabled);
         renderAlertAvailabilityWarning();
     } catch (err) {
         console.log('failed to load alert settings', err);
@@ -316,46 +281,62 @@ async function loadAlertSettings() {
 }
 
 function renderAlertAvailabilityWarning() {
-    const channelEl = document.getElementById('alert-channel');
-    const warningEl = document.getElementById('alert-warning');
-    if (!channelEl || !warningEl) return;
+    const slackEnabled = document.getElementById('alert-slack-enabled')?.checked;
+    const gmailEnabled = document.getElementById('alert-gmail-enabled')?.checked;
+    const slackWarnEl = document.getElementById('alert-warning-slack');
+    const gmailWarnEl = document.getElementById('alert-warning-gmail');
 
-    const channel = channelEl.value;
-    if (!alertAvailability[channel]) {
-        const envHint = channel === 'slack'
-            ? 'APIWATCH_SLACK_WEBHOOK_URL is not set on the container.'
-            : 'APIWATCH_GMAIL_USER / APIWATCH_GMAIL_APP_PASSWORD are not set on the container.';
-        const label = channel === 'slack' ? 'Slack' : 'Gmail';
-        warningEl.textContent = `${label} isn't configured yet. ${envHint}`;
-        warningEl.classList.remove('hidden');
-    } else {
-        warningEl.classList.add('hidden');
+    if (slackWarnEl) {
+        const show = slackEnabled && !alertAvailability.slack;
+        if (show) {
+            slackWarnEl.textContent = "Slack isn't configured yet. APIWATCH_SLACK_WEBHOOK_URL is not set on the container.";
+        }
+        slackWarnEl.classList.toggle('hidden', !show);
+    }
+
+    if (gmailWarnEl) {
+        const show = gmailEnabled && !alertAvailability.gmail;
+        if (show) {
+            gmailWarnEl.textContent = "Gmail isn't configured yet. APIWATCH_GMAIL_USER / APIWATCH_GMAIL_APP_PASSWORD are not set on the container.";
+        }
+        gmailWarnEl.classList.toggle('hidden', !show);
     }
 }
 
-function onAlertChannelChange() {
+function onAlertChannelToggle() {
     renderAlertAvailabilityWarning();
 }
 
-function updateAlertStatusBadge(enabled) {
+function updateAlertStatusBadge(slackEnabled, gmailEnabled) {
     const badge = document.getElementById('alerts-status-badge');
     if (!badge) return;
-    badge.textContent = enabled ? 'Enabled' : 'Disabled';
-    badge.classList.toggle('enabled', !!enabled);
 
-    // the alerts card's left accent bar goes green ("armed") when alerts
-    // are actually on, same visual language as the other stat cards
+    let label = 'Disabled';
+    if (slackEnabled && gmailEnabled) label = 'Slack + Gmail';
+    else if (slackEnabled) label = 'Slack';
+    else if (gmailEnabled) label = 'Gmail';
+
+    const anyEnabled = slackEnabled || gmailEnabled;
+    badge.textContent = label;
+    badge.classList.toggle('enabled', anyEnabled);
+
+    // armed state: green accent bar when any channel is on, same visual
+    // language as the other stat cards reacting to their own numbers
     const card = document.getElementById('alert-card');
-    if (card) card.classList.toggle('enabled', !!enabled);
+    if (card) card.classList.toggle('enabled', anyEnabled);
 }
 
 async function saveAlertSettings() {
-    const channel = document.getElementById('alert-channel').value;
+    const slack_enabled = document.getElementById('alert-slack-enabled').checked;
+    const gmail_enabled = document.getElementById('alert-gmail-enabled').checked;
     const min_level = document.getElementById('alert-min-level').value;
-    const enabled = document.getElementById('alert-enabled').checked;
 
-    if (enabled && !alertAvailability[channel]) {
-        alert(`Can't enable ${channel === 'slack' ? 'Slack' : 'Gmail'} alerts, that channel isn't configured on the server yet.`);
+    if (slack_enabled && !alertAvailability.slack) {
+        alert("Can't enable Slack alerts, that channel isn't configured on the server yet.");
+        return;
+    }
+    if (gmail_enabled && !alertAvailability.gmail) {
+        alert("Can't enable Gmail alerts, that channel isn't configured on the server yet.");
         return;
     }
 
@@ -363,7 +344,7 @@ async function saveAlertSettings() {
         const res = await fetch('/api/alerts/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ channel, min_level, enabled })
+            body: JSON.stringify({ slack_enabled, gmail_enabled, min_level })
         });
         if (!res.ok) {
             const err = await res.json();
@@ -371,15 +352,13 @@ async function saveAlertSettings() {
             return;
         }
         const data = await res.json().catch(() => ({}));
-        updateAlertStatusBadge(enabled);
+        updateAlertStatusBadge(slack_enabled, gmail_enabled);
         showAlertFlash(data.status === 'saved' ? 'Saved' : 'Done');
     } catch (err) {
         console.log('failed to save alert settings', err);
     }
 }
 
-// small self-dismissing confirmation next to the Save button - no modal,
-// no alert(), just a quiet fade in/out so it doesn't demand attention
 let alertFlashTimer = null;
 function showAlertFlash(text) {
     const el = document.getElementById('alert-save-flash');
@@ -395,9 +374,6 @@ function showAlertFlash(text) {
 let searchDebounceTimer = null;
 function onSearchInput() {
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
-    // debounce so we're not hitting the db on every keystroke, only once
-    // typing pauses, this now searches every log in the db, not just
-    // whatever page happens to be loaded client-side
     searchDebounceTimer = setTimeout(() => {
         fetchPage(1);
     }, 300);
@@ -451,19 +427,6 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;');
 }
 
-// IMPORTANT: .json-line has `white-space: pre-wrap` in the CSS so long
-// values wrap instead of overflowing. That means any newline/indentation
-// embedded in the HTML string we build here gets rendered literally by the
-// browser. Every string returned for a single .json-line MUST therefore be
-// built as one unbroken line with no template-literal line breaks inside it.
-// Only the .json-children wrapper (indentation via margin-left) should ever
-// introduce structural nesting/whitespace.
-//
-// `term` is the active search term, threaded through recursively so string
-// values anywhere in the tree get the same highlighting the collapsed row
-// preview already had - previously this only escaped values and never knew
-// what was searched for, so a match buried inside an expanded JSON payload
-// was invisible even though it's the reason that row matched at all.
 function renderJsonNode(value, keyLabel, depth, term) {
     const keyHtml = keyLabel !== null
         ? `<span class="json-key">"${escapeHtml(keyLabel)}"</span>: `
@@ -551,8 +514,6 @@ async function copyDetailField(id, field, btnEl) {
     try {
         const parsed = JSON.parse(toCopy);
         if (parsed !== null && typeof parsed === 'object') {
-            // copy the indented version, not the single-line raw string,
-            // that's what's actually useful to paste elsewhere
             toCopy = JSON.stringify(parsed, null, 2);
         }
     } catch (e) {
@@ -582,11 +543,6 @@ function addRequest(req) {
     all_requests_count++;
     noteContainer(req.container_name);
 
-    // keep the client-side cache capped to one page's worth while logs
-    // stream in live. Without this, allRequests grows unbounded past
-    // pageLimit and page 1 silently shows more than 100 rows until a
-    // refresh resets it. The row that rolls off here isn't lost — it's
-    // still on the server, reachable by paging forward with Next.
     let overflowed = false;
     if (allRequests.length > pageLimit) {
         allRequests.length = pageLimit;
@@ -605,9 +561,6 @@ function addRequest(req) {
 
     if (isLive) {
         if (overflowed) {
-            // an existing row dropped off the bottom of the page, so the
-            // cheap "just prepend one row" path is no longer accurate -
-            // re-render fully from the (now-capped) array instead
             applyFilters();
         } else {
             renderNewRequest(req);
@@ -618,8 +571,6 @@ function addRequest(req) {
     }
 }
 
-// beacon briefly flips to alert red when an error just came through, so
-// the header status dot means something instead of just pulsing forever
 let beaconResetTimer = null;
 function updateBeacon(isError) {
     if (!statusDotEl) return;
@@ -649,8 +600,6 @@ function renderNewRequest(req) {
     requestsEl.insertAdjacentHTML('afterbegin', renderRequest(req));
 }
 
-// wraps every case-insensitive occurrence of the search term in <mark>,
-// escaping first so we never inject the raw (unescaped) search text
 function highlightMatch(text, term) {
     const escaped = escapeHtml(text);
     if (!term) return escaped;
@@ -751,7 +700,7 @@ function renderRequests(requests) {
 // ---------------- Export ----------------
 function exportLogs() {
     const filtered = getFilteredRequests();
-    const payload = filtered.map(({ id, ...rest }) => rest); // drop the client-only synthetic id
+    const payload = filtered.map(({ id, ...rest }) => rest);
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -772,12 +721,6 @@ function updateStats() {
     const errorRate = stats.total > 0 ? Math.round((stats.errors / stats.total) * 100) : 0;
     document.getElementById('error-rate').textContent = errorRate + '%';
 
-    // knownContainers is populated from /api/containers plus anything new
-    // seen live - the same source the Container filter dropdown uses, so
-    // this number now always matches what that dropdown lists. Previously
-    // this counted only containers present in the currently loaded page,
-    // which disagreed with the dropdown whenever the page was filtered
-    // or just didn't happen to include every container.
     document.getElementById('active-containers').textContent = knownContainers.size;
 
     updateCharts();
@@ -809,6 +752,26 @@ async function clearRequests() {
     }
 }
 
+// ---------------- Header menu (mobile) ----------------
+function toggleHeaderMenu(event) {
+    event.stopPropagation();
+    const dropdown = document.getElementById('header-menu-dropdown');
+    const btn = document.getElementById('header-menu-btn');
+    if (!dropdown) return;
+    const isOpen = !dropdown.classList.contains('hidden');
+    dropdown.classList.toggle('hidden', isOpen);
+    if (btn) btn.setAttribute('aria-expanded', String(!isOpen));
+}
+
+document.addEventListener('click', (event) => {
+    const dropdown = document.getElementById('header-menu-dropdown');
+    const btn = document.getElementById('header-menu-btn');
+    if (!dropdown || dropdown.classList.contains('hidden')) return;
+    if (dropdown.contains(event.target) || (btn && btn.contains(event.target))) return;
+    dropdown.classList.add('hidden');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+});
+
 // ---------------- Initialize ----------------
 loadTheme();
 
@@ -824,8 +787,6 @@ async function checkAuthAndInit() {
     const loadingEl = document.getElementById('app-loading');
 
     if (localStorage.getItem('auth') !== 'true') {
-        // no stored session at all - go straight to login, no fetch
-        // needed so there's nothing to wait on
         if (loadingEl) loadingEl.classList.add('hidden');
         LOGIN_PAGE.classList.remove('hidden');
         return;
@@ -834,7 +795,6 @@ async function checkAuthAndInit() {
     try {
         const res = await fetch('/api/me');
         if (!res.ok) {
-            // cookie expired or was never valid, stale localStorage flag
             localStorage.removeItem('auth');
             if (loadingEl) loadingEl.classList.add('hidden');
             LOGIN_PAGE.classList.remove('hidden');

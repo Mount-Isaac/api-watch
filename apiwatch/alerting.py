@@ -1,8 +1,9 @@
 """
-AlertManager: watches broadcasted log records and fires a Slack or Gmail
-alert when one crosses the severity threshold the user configured in the
-UI. Credentials come from env vars only, never stored in the db, only
-the channel choice and threshold live there.
+AlertManager: watches broadcasted log records and fires Slack and/or
+Gmail alerts when one crosses the severity threshold configured in the
+UI. Slack and Gmail are independent toggles - both can fire on the same
+log. Credentials come from env vars only, never stored in the db, only
+the channel toggles and threshold live there.
 """
 import asyncio
 import os
@@ -75,28 +76,35 @@ class AlertManager:
         """
         Call this with every log record, no-ops fast if nothing applies.
 
-        Everything up to and including the cooldown check stays awaited
-        inline - it's all cheap (a settings lookup, dict comparisons) and
-        the caller genuinely does need those checks to happen in order,
-        e.g. so a burst of records in the same tick doesn't slip past the
-        cooldown before self._last_sent gets updated.
+        Everything up to and including the per-channel cooldown check
+        stays awaited inline - it's all cheap (a settings lookup, dict
+        comparisons) and the caller genuinely does need those checks to
+        happen in order, e.g. so a burst of records in the same tick
+        doesn't slip past the cooldown before self._last_sent gets
+        updated.
 
         The actual network call (Slack webhook / SMTP) is the slow,
         unpredictable part, so that's the piece that gets detached into
-        its own task instead of being awaited here. Without this, a
-        caller doing `await alert_manager.maybe_alert(record)` in the
-        main log-ingestion loop would stall processing subsequent log
+        its own task per channel instead of being awaited here. Without
+        this, a caller doing `await alert_manager.maybe_alert(record)` in
+        the main log-ingestion loop would stall processing subsequent log
         lines for however long Slack or Gmail take to respond (up to the
         5s/10s timeouts below) - exactly when you least want ingestion
         and the live websocket broadcast to lag.
+
+        Slack and Gmail are independent toggles - both can fire on the
+        same record, each against its own cooldown clock, so one channel
+        being on cooldown never blocks the other from sending.
         """
         settings = await self.db.get_alert_settings()
-        if not settings or not settings.get('enabled'):
+        if not settings:
             return
 
-        channel = settings.get('channel')
-        min_level = settings.get('min_level', 'ERROR')
-        level = record.get('level') or 'UNKNOWN'
+        # case-insensitive on both sides: env/UI-configured threshold and
+        # the level actually stored can each come from apps that emit
+        # INFO, info, or InFO depending on their own logging setup
+        min_level = (settings.get('min_level') or 'ERROR').upper()
+        level = (record.get('level') or 'UNKNOWN').upper()
 
         # only fire at-or-worse than the configured threshold, lower
         # rank number means more severe
@@ -104,23 +112,24 @@ class AlertManager:
             return
 
         avail = self.availability()
-        if not avail.get(channel):
-            # settings say "alert via X" but X's credentials aren't
-            # configured, the UI already warns about this at config
-            # time, here we just skip rather than crash the pipeline
-            return
+        channels = []
+        if settings.get('slack_enabled') and avail.get('slack'):
+            channels.append('slack')
+        if settings.get('gmail_enabled') and avail.get('gmail'):
+            channels.append('gmail')
 
         now = time.time()
-        last = self._last_sent.get(channel, 0)
-        if now - last < self.cooldown_seconds:
-            return
-        self._last_sent[channel] = now
+        for channel in channels:
+            last = self._last_sent.get(channel, 0)
+            if now - last < self.cooldown_seconds:
+                continue
+            self._last_sent[channel] = now
 
-        # dispatch and return immediately - the caller's await on
-        # maybe_alert() resolves now, not once Slack/Gmail respond
-        task = asyncio.create_task(self._dispatch(channel, record))
-        self._background_tasks.add(task)
-        task.add_done_callback(self._background_tasks.discard)
+            # dispatch and return immediately - the caller's await on
+            # maybe_alert() resolves now, not once Slack/Gmail respond
+            task = asyncio.create_task(self._dispatch(channel, record))
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
 
     async def _dispatch(self, channel: str, record: dict):
         """
@@ -165,19 +174,12 @@ class AlertManager:
         blocks = [
             {
                 'type': 'section',
-                'text': {
-                    'type': 'mrkdwn',
-                    'text': f"{style['emoji']} *{level}* in `{container}`"
-                }
-            },
-            {
-                'type': 'section',
                 'text': {'type': 'mrkdwn', 'text': f"```{body}```"}
             },
             {
                 'type': 'context',
                 'elements': [
-                    {'type': 'mrkdwn', 'text': f"🕐 {timestamp}  ·  via api-watch"}
+                    {'type': 'mrkdwn', 'text': f"{style['emoji']} *{level}* · `{container}` · 🕐 {timestamp}  ·  via api-watch"}
                 ]
             }
         ]

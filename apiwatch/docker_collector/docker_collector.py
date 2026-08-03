@@ -98,6 +98,16 @@ class DockerCollector:
             os.getenv("APIWATCH_CLEANUP_INTERVAL_SECONDS", "3600")
         )
 
+        # optional allowlist of levels to actually keep, case-insensitive
+        # on input ("INFO", "info", "InFO" all normalize the same way).
+        # None means no filter, everything is kept, matching today's
+        # default behavior for anyone who hasn't set this
+        raw_levels = os.getenv("APIWATCH_LOG_LEVELS")
+        self.log_level_filter = (
+            {lvl.strip().upper() for lvl in raw_levels.split(",") if lvl.strip()}
+            if raw_levels else None
+        )
+
         self.docker: Optional[aiodocker.Docker] = None
         self.watched: Dict[str, asyncio.Task] = {}
         self._poll_task: Optional[asyncio.Task] = None
@@ -110,10 +120,11 @@ class DockerCollector:
         """Call this from server.py's start(), after db.init() has run."""
         if self._running:
             return
-        self.docker = aiodocker.Docker()
+        self.docker = aiodocker.Docker(url=os.getenv("DOCKER_HOST"))
         self._running = True
         self._poll_task = asyncio.create_task(self._poll_loop())
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+        # print("[ApiWatchdog] Docker collector started", flush=True)
 
     async def stop(self):
         """Call this from server.py's stop(). Does not touch the db."""
@@ -178,7 +189,10 @@ class DockerCollector:
             "container_id": parsed["container_id"],
             "container_name": parsed["container_name"],
             "service": parsed["service_label"],
-            "level": parsed["level"],
+            # normalized to uppercase here once, so storage, the env
+            # filter below, and level-based UI logic all agree, whether
+            # the source app printed "INFO", "info", or "InFO"
+            "level": (parsed["level"] or "UNKNOWN").upper(),
             "logger": parsed["logger"],
             "message": parsed["message"],
             "raw": parsed["raw"],
@@ -206,6 +220,26 @@ class DockerCollector:
                     service_label=service_label,
                 )
                 record = self._record_from_parsed(parsed)
+                now = time.time()
+
+                # checkpoint advances regardless of the filter below, a
+                # container that only ever emits filtered-out levels
+                # (e.g. pure DEBUG noise with APIWATCH_LOG_LEVELS=ERROR)
+                # still needs its checkpoint to move forward, otherwise
+                # every restart re-requests the same old backlog from
+                # docker just to filter it all out again
+                if now - last_checkpoint >= self.checkpoint_interval:
+                    await self.db.set_checkpoint(container_id, container_name, int(now))
+                    last_checkpoint = now
+
+                # env-configured allowlist, dropped here means gone for
+                # good, never stored, never broadcast, never printed.
+                # this is a deploy-time noise filter (e.g. skip DEBUG in
+                # prod), not a UI display filter, there's no getting it
+                # back later if the threshold turns out wrong
+                if self.log_level_filter and record["level"] not in self.log_level_filter:
+                    continue
+
                 buffer.append(record)
 
                 # terminal output is just a heartbeat, not the actual
@@ -221,15 +255,10 @@ class DockerCollector:
                 if self.broadcast:
                     await self.broadcast(record)
 
-                now = time.time()
                 if len(buffer) >= self.batch_size or now - last_flush >= self.batch_interval:
                     await self.db.insert_logs_batch(buffer)
                     buffer.clear()
                     last_flush = now
-
-                if now - last_checkpoint >= self.checkpoint_interval:
-                    await self.db.set_checkpoint(container_id, container_name, int(now))
-                    last_checkpoint = now
 
         except asyncio.CancelledError:
             raise

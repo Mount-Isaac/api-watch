@@ -34,7 +34,7 @@ _server_lock = threading.Lock()
 class DashboardServer:
     """Centralized dashboard server"""
     
-    def __init__(self, host='0.0.0.0', port=22222, max_history=1000, username = "admin", password="admin"):
+    def __init__(self, host='0.0.0.0', port=22222, max_history=1000, username = "admin", password="password"):
         self.host = host
         self.port = port
         self.max_history = max_history
@@ -199,28 +199,26 @@ class DashboardServer:
     async def api_alerts_settings_get_handler(self, request):
         settings = await self.db.get_alert_settings()
         if not settings:
-            return web.json_response({'channel': None, 'min_level': 'ERROR', 'enabled': False})
+            return web.json_response({'slack_enabled': False, 'gmail_enabled': False, 'min_level': 'ERROR'})
         return web.json_response({
-            'channel': settings.get('channel'),
+            'slack_enabled': bool(settings.get('slack_enabled')),
+            'gmail_enabled': bool(settings.get('gmail_enabled')),
             'min_level': settings.get('min_level', 'ERROR'),
-            'enabled': bool(settings.get('enabled')),
         })
 
     async def api_alerts_settings_post_handler(self, request):
         data = await request.json()
-        channel = data.get('channel')
-        min_level = data.get('min_level', 'ERROR')
-        enabled = bool(data.get('enabled'))
+        slack_enabled = bool(data.get('slack_enabled'))
+        gmail_enabled = bool(data.get('gmail_enabled'))
+        min_level = (data.get('min_level') or 'ERROR').upper()
 
-        if enabled and channel not in ('slack', 'gmail'):
-            return web.json_response({'error': 'channel must be slack or gmail'}, status=400)
+        avail = self.alerts.availability()
+        if slack_enabled and not avail.get('slack'):
+            return web.json_response({'error': 'slack is not configured, missing required env vars'}, status=400)
+        if gmail_enabled and not avail.get('gmail'):
+            return web.json_response({'error': 'gmail is not configured, missing required env vars'}, status=400)
 
-        if enabled and not self.alerts.availability().get(channel):
-            return web.json_response({
-                'error': f'{channel} is not configured, missing required env vars'
-            }, status=400)
-
-        await self.db.save_alert_settings(channel, min_level, enabled)
+        await self.db.save_alert_settings(slack_enabled, gmail_enabled, min_level)
         return web.json_response({'status': 'saved'})
     
     async def api_clear_handler(self, request):
@@ -236,7 +234,6 @@ class DashboardServer:
 
         BASE_DIR = Path(__file__).parent / 'ui'
         self.app.router.add_static('/static', path=BASE_DIR, name='static')
-        print(f'base dir:{BASE_DIR}')
         self.app.router.add_get('/', self.dashboard_handler)
         self.app.router.add_get('/ws', self.websocket_handler)
         self.app.router.add_post('/auth', self.get_auth_credentials)
@@ -260,8 +257,6 @@ class DashboardServer:
         await self.collector.start()
         asyncio.create_task(self._session_cleanup_loop())
         
-        print(f"[ApiWatchdog] Dashboard started at http://{self.host}:{self.port}")
-    
     async def stop(self):
         """Stop the server"""
         await self.collector.stop()

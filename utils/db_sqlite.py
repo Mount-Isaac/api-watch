@@ -59,17 +59,27 @@ class AsyncDB:
             );
             ''')
 
-            # single-row config for alerting, the user picks channel +
-            # threshold from the UI, credentials themselves stay in env
-            # vars, never stored here
+            # single-row config for alerting, slack and gmail are
+            # independent toggles now (both can fire on the same log),
+            # credentials themselves stay in env vars, never stored here
             await db.execute('''
             CREATE TABLE IF NOT EXISTS alert_settings (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
-                channel TEXT,
-                min_level TEXT DEFAULT 'ERROR',
-                enabled INTEGER DEFAULT 0
+                slack_enabled INTEGER DEFAULT 0,
+                gmail_enabled INTEGER DEFAULT 0,
+                min_level TEXT DEFAULT 'ERROR'
             );
             ''')
+            # migration for dbs created before multi-channel support,
+            # ADD COLUMN fails harmlessly if the column already exists
+            for stmt in (
+                "ALTER TABLE alert_settings ADD COLUMN slack_enabled INTEGER DEFAULT 0",
+                "ALTER TABLE alert_settings ADD COLUMN gmail_enabled INTEGER DEFAULT 0",
+            ):
+                try:
+                    await db.execute(stmt)
+                except Exception:
+                    pass
 
             await db.execute(
                 'CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON container_logs(timestamp)'
@@ -256,16 +266,16 @@ class AsyncDB:
             row = await cur.fetchone()
             return dict(row) if row else None
 
-    async def save_alert_settings(self, channel: str, min_level: str, enabled: bool):
+    async def save_alert_settings(self, slack_enabled: bool, gmail_enabled: bool, min_level: str):
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute('''
-                INSERT INTO alert_settings (id, channel, min_level, enabled)
+                INSERT INTO alert_settings (id, slack_enabled, gmail_enabled, min_level)
                 VALUES (1, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
-                    channel = excluded.channel,
-                    min_level = excluded.min_level,
-                    enabled = excluded.enabled
-            ''', (channel, min_level, int(enabled)))
+                    slack_enabled = excluded.slack_enabled,
+                    gmail_enabled = excluded.gmail_enabled,
+                    min_level = excluded.min_level
+            ''', (int(slack_enabled), int(gmail_enabled), min_level))
             await db.commit()
 
     # ---- sessions (auth) ----

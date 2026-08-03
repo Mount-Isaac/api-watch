@@ -204,6 +204,9 @@ body {
 
 /* ---------------- Buttons ---------------- */
 .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
     color: var(--text-secondary);
@@ -241,7 +244,6 @@ body {
     height: 7px;
     border-radius: 50%;
     background: var(--accent);
-    animation: pulse 2s infinite;
 }
 
 .btn-live.paused {
@@ -254,6 +256,118 @@ body {
     background: var(--warning-text);
     animation: none;
     border-radius: 1px;
+}
+
+/* ---------------- Responsive header controls ---------------- */
+/* two parallel control sets: desktop shows Dark Mode + Logout inline,
+   mobile swaps them for a single hamburger button + dropdown. Only one
+   set is ever visible at a time via the media query below. */
+.desktop-controls {
+    display: inline-flex;
+}
+
+.mobile-controls {
+    display: none;
+}
+
+.header-menu {
+    position: relative;
+}
+
+.header-menu-btn {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+}
+
+.header-menu-btn:hover {
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.header-menu-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    min-width: 150px;
+    padding: 4px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.header-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    background: none;
+    border: none;
+    border-radius: 3px;
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.header-menu-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.header-menu-item .icon-moon {
+    display: none;
+}
+
+body.light-mode .header-menu-item .icon-sun {
+    display: none;
+}
+
+body.light-mode .header-menu-item .icon-moon {
+    display: inline;
+}
+
+/* icon-only fallback: Export/Clear/Live drop their text labels first,
+   before anything is ever fully hidden, once space gets tight */
+@media (max-width: 900px) {
+    .header .btn-label {
+        display: none;
+    }
+
+    .header-right .btn {
+        padding: 6px 8px;
+    }
+}
+
+/* below this, Dark Mode + Logout collapse into the hamburger menu */
+@media (max-width: 600px) {
+    .desktop-controls {
+        display: none;
+    }
+
+    .mobile-controls {
+        display: inline-flex;
+    }
+
+    .header {
+        flex-wrap: wrap;
+        row-gap: 8px;
+    }
 }
 
 /* ---------------- Layout ---------------- */
@@ -749,7 +863,7 @@ body {
 .alert-card {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     justify-content: flex-start;
 }
 
@@ -765,17 +879,94 @@ body {
     align-items: center;
 }
 
-.alert-card-controls {
+/* each config group (Channels, Threshold) gets its own micro-label -
+   without this the checkboxes/select just read as loose controls with
+   no indication of what they belong to */
+.alert-card-section {
     display: flex;
+    flex-direction: column;
     gap: 6px;
-    flex-wrap: wrap;
 }
 
-.alert-card-controls .select {
-    flex: 1;
-    min-width: 90px;
-    padding: 5px 7px;
-    font-size: 11px;
+.alert-card-section-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+
+/* real toggle switches instead of raw checkboxes - label on the left,
+   switch on the right, matches the settings-row pattern most people
+   already know from Slack/Linear/Stripe rather than a bare checkbox */
+.alert-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: 1px 0;
+}
+
+.alert-toggle-name {
+    font-size: 12px;
+    font-family: var(--font-ui);
+    color: var(--text-primary);
+}
+
+.alert-toggle-switch-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.alert-toggle-input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+}
+
+.alert-toggle-switch {
+    position: relative;
+    width: 30px;
+    height: 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.alert-toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 12px;
+    height: 12px;
+    background: var(--text-tertiary);
+    border-radius: 50%;
+    transition: transform 0.15s, background 0.15s;
+}
+
+.alert-toggle-input:checked+.alert-toggle-switch {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+}
+
+.alert-toggle-input:checked+.alert-toggle-switch::after {
+    transform: translateX(14px);
+    background: var(--accent);
+}
+
+.alert-toggle-input:focus-visible+.alert-toggle-switch {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.alert-card-select {
+    width: 100%;
 }
 
 .alert-card-footer {
@@ -783,12 +974,8 @@ body {
     justify-content: space-between;
     align-items: center;
     gap: 8px;
-}
-
-.alert-save-wrap {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
 }
 
 /* quiet confirmation, not a popup - fades in place next to the button
@@ -813,13 +1000,15 @@ body {
     font-size: 11px;
 }
 
-/* deliberately calmer than the default .btn hover - a small opacity
-   shift instead of swapping background/border/text color all at once */
+/* deliberately calmer than the default .btn hover - background lifts
+   and the border sharpens, but the text stays muted rather than jumping
+   straight to full-bright. Previously this reset background to the
+   button's own resting color, which meant nothing visibly changed in
+   dark mode; var(--bg-elevated) is a genuinely different shade in both
+   themes, so the hover state is now actually perceivable everywhere. */
 .btn-sm:hover {
-    background: var(--bg-tertiary);
-    border-color: var(--border);
-    color: var(--text-primary);
-    opacity: 0.85;
+    background: var(--bg-elevated);
+    border-color: var(--border-hover);
 }
 
 .alerts-status-badge {
@@ -838,21 +1027,6 @@ body {
 .alerts-status-badge.enabled {
     background: var(--success-bg);
     color: var(--success-text);
-}
-
-.alert-enable-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    font-family: var(--font-ui);
-    color: var(--text-primary);
-    cursor: pointer;
-}
-
-.alert-enable-label input[type="checkbox"] {
-    cursor: pointer;
-    accent-color: var(--accent);
 }
 
 .alert-warning {

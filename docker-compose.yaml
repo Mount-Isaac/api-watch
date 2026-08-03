@@ -7,6 +7,6 @@ services:
     network_mode: host
     env_file:
       - ./.env
-    command: python -m apiwatch
     volumes:
-    - ./data:/app/data
+      - ./data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock

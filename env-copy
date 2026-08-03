@@ -1,4 +1,7 @@
 WATCHDOG_USERNAME=admin
-WATCHDOG_PASSWORD=admin
-API_WATCH_DASHBOARD_HOST=127.0.0.1
+WATCHDOG_PASSWORD=password
+API_WATCH_DASHBOARD_HOST=0.0.0.0
 API_WATCH_DASHBOARD_PORT=22222
+APIWATCH_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/[your-slack-app-uuid-url]
+APIWATCH_GMAIL_USER=[your-gmail-address]@gmail.com
+APIWATCH_GMAIL_APP_PASSWORD=[your-gmail-address-app-password]
