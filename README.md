@@ -206,4 +206,4 @@ MIT
 
 If api-watch saved you time, ⭐ star the repository to help others discover it.
 
-Want to support development? ☕ Buy me a coffee on [Ko-fi](https://ko-fi.com/isaackyalo).
+Want to support development? Buy me a coffee on [Ko-fi](https://ko-fi.com/isaackyalo).
