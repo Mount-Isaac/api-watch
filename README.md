@@ -125,7 +125,6 @@ services:
 | Search history | ✅ | Limited | ✅ |
 | JSON viewer | ✅ | Basic | ✅ |
 | Slack/Gmail alerts | ✅ | ❌ | ✅ |
-| SQLite | ✅ | ❌ | ❌ |
 | One-container setup | ✅ | ✅ | ❌ |
 | Enterprise scale | ❌ | ❌ | ✅ |
 
@@ -164,11 +163,16 @@ See `.env.example` for descriptions and examples.
 
 ## Data retention
 
-Logs are stored in SQLite under `/app/data`.
+Logs are stored in SQLite under `/app/apiwatch-data` (mounted to `./apiwatch-data` on your host).
 
 Mount a volume to preserve history across restarts.
 
 Old logs are automatically removed according to `APIWATCH_RETENTION_HOURS`.
+
+> **Switching between Docker and local Python?** If you run api-watch via Docker/docker-compose first, `apiwatch-data/` gets created owned by the container's user (root). If you then try running `python -m apiwatch` locally, you'll hit `sqlite3.OperationalError: attempt to write a readonly database`. Fix it with:
+> ```bash
+> sudo chown -R $USER:$USER apiwatch-data/
+> ```
 
 ---
 
