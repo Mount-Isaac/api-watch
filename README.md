@@ -6,7 +6,7 @@ One container. No Redis, no log-shipping agent, no config sprawl. Point it at yo
 
 ![status](https://img.shields.io/badge/status-active-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue)
 
-![api-watch demo](./images/apiwatch-demo.mp4)
+![api-watch demo](./images/apiwatch.gif)
 
 ---
 
