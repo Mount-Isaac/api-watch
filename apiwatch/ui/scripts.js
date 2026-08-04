@@ -1,5 +1,3 @@
-console.log('[apiwatch] scripts.js loaded, build: v3-redesign+alerts');
-
 const DASHBOARD = document.getElementById('dashboard');
 const LOGIN_PAGE = document.getElementById('login-page');
 const ERROR_EL = document.getElementById('login-error');
@@ -434,10 +432,12 @@ function renderJsonNode(value, keyLabel, depth, term) {
         return `<div class="json-line">${keyHtml}<span class="json-null">null</span></div>`;
     }
     if (typeof value === 'boolean') {
-        return `<div class="json-line">${keyHtml}<span class="json-bool">${value}</span></div>`;
+        return `<div class="json-line">${keyHtml}<span class="json-bool">${highlightMatch(value, term)}</span></div>`;
+
     }
     if (typeof value === 'number') {
-        return `<div class="json-line">${keyHtml}<span class="json-number">${value}</span></div>`;
+        return `<div class="json-line">${keyHtml}<span class="json-number">${highlightMatch(value, term)}</span></div>`;
+
     }
     if (typeof value === 'string') {
         return `<div class="json-line">${keyHtml}<span class="json-string">"${highlightMatch(value, term)}"</span></div>`;
@@ -487,41 +487,8 @@ function toggleJsonNode(clickedEl) {
     if (icon) icon.textContent = isCollapsed ? '\u25B8' : '\u25BE';
 }
 
-// function renderDetailContent(text, parsedDataJson) {
-//     // parsed_data comes from the backend already correctly parsed
-//     // (handles Python dict repr like {'ok': True}, which JSON.parse
-//     // can never handle since it's not valid JSON syntax). Prefer it
-//     // whenever the backend found something, only fall back to trying
-//     // to parse the raw string ourselves if it didn't.
-//     if (parsedDataJson) {
-//         try {
-//             const parsed = JSON.parse(parsedDataJson);
-//             if (parsed !== null && typeof parsed === 'object') {
-//                 return `<div class="json-tree">${renderJsonNode(parsed, null, 0)}</div>`;
-//             }
-//         } catch (e) {
-//             // fall through
-//         }
-//     }
-
-//     if (!text) return '';
-//     try {
-//         const parsed = JSON.parse(text);
-//         if (parsed !== null && typeof parsed === 'object') {
-//             return `<div class="json-tree">${renderJsonNode(parsed, null, 0)}</div>`;
-//         }
-//     } catch (e) {
-//         // not JSON, fall through to plain text
-//     }
-//     return `<pre>${escapeHtml(text)}</pre>`;
-// }
 
 function renderDetailContent(text, parsedDataJson, term) {
-    // parsed_data comes from the backend already correctly parsed
-    // (handles Python dict repr like {'ok': True}, which JSON.parse
-    // can never handle since it's not valid JSON syntax). Prefer it
-    // whenever the backend found something, only fall back to trying
-    // to parse the raw string ourselves if it didn't.
     if (parsedDataJson) {
         try {
             const parsed = JSON.parse(parsedDataJson);
@@ -545,18 +512,6 @@ function renderDetailContent(text, parsedDataJson, term) {
     return `<pre>${highlightMatch(text, term)}</pre>`;
 }
 
-// function renderDetailContent(text, term) {
-//     if (!text) return '';
-//     try {
-//         const parsed = JSON.parse(text);
-//         if (parsed !== null && typeof parsed === 'object') {
-//             return `<div class="json-tree">${renderJsonNode(parsed, null, 0, term)}</div>`;
-//         }
-//     } catch (e) {
-//         // not JSON, fall through to plain text
-//     }
-//     return `<pre>${highlightMatch(text, term)}</pre>`;
-// }
 
 function findRequestById(id) {
     return allRequests.find(r => String(r.id) === String(id));
