@@ -33,7 +33,7 @@ _server_lock = threading.Lock()
 class DashboardServer:
     """Centralized dashboard server"""
     
-    def __init__(self, host='0.0.0.0', port=22222, max_history=1000, username = "admin", password="admin"):
+    def __init__(self, host='0.0.0.0', port=22222, max_history=1000, username = "admin", password="password"):
         self.host = host
         self.port = port
         self.max_history = max_history

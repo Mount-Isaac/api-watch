@@ -1,7 +1,6 @@
 services:
   apiwatch:
     image: theisaac/api-watch:latest
-    # build: .
     ports:
       - "22222:22222"
     restart: unless-stopped
@@ -10,3 +9,4 @@ services:
     volumes:
       - ./data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock
+
