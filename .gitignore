@@ -72,3 +72,6 @@ Thumbs.db
 data/
 *.mkv
 *.mp4
+
+apiwatch-data
+api-watch-data
