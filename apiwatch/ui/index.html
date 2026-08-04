@@ -5,17 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>api-watch - Live Logs</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <!-- <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" /> -->
-    <!-- <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"> -->
-    <!-- <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"> -->
     <link rel="stylesheet" href="/static/styles.css" />
     <link rel="icon" type="image/png" href="/static/logo.png" />
   </head>
   <body>
-    <!-- Loading gate - shown until the /api/me auth check resolves, so we
-         never flash the login page for a second before redirecting into
-         the dashboard on a valid session. Reuses the same wordmark/dots
-         components as elsewhere so it doesn't look like a separate screen. -->
+    <!-- 
+      Loading gate - shown until the /api/me auth check resolves, so we
+      never flash the login page for a second before redirecting into
+      the dashboard on a valid session.
+    -->
     <div id="app-loading" class="app-loading">
       <div class="app-loading-mark">api-watch<span class="cursor-blink"></span></div>
       <div class="loading-dots">

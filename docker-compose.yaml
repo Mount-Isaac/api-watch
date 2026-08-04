@@ -1,12 +1,12 @@
 services:
   apiwatch:
-    build: .
+    image: theisaac/api-watch:latest
+    # build: .
     ports:
-      - "${API_WATCH_DASHBOARD_PORT}:${API_WATCH_DASHBOARD_PORT}"
+      - "22222:22222"
     restart: unless-stopped
-    network_mode: host
     env_file:
-      - ./.env
+      - .env
     volumes:
       - ./data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock

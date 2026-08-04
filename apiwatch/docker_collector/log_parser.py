@@ -1,9 +1,8 @@
 """
-apiwatch v2, phase 2: shape raw log lines into structured documents.
+Shape raw log lines into structured documents.
 
 Real containers emit multiple log formats from the same stdout stream,
-gunicorn's own lines look nothing like your app's logger lines. This
-parser tries known formats first and falls back to a raw record rather
+This parser tries known formats first and falls back to a raw record rather
 than dropping or crashing on anything it doesn't recognize. A log
 collector that throws away lines it can't parse is worse than useless,
 you lose exactly the weird lines you'd want to see.
@@ -28,7 +27,7 @@ GUNICORN_RE = re.compile(
     r'\[(?P<pid>\d+)\]\s*\[(?P<level>\w+)\]\s*(?P<message>.*)$'
 )
 
-# python logging default-ish format, what your Django app is emitting:
+# python logging default-ish format, what your Django/Flask/FastAPI/Express/Springboot/Apolo app is emitting:
 # WARNING 2026-07-29 19:43:41,687 phone_locking.api API error response: ...
 PYLOG_RE = re.compile(
     r'^(?P<level>DEBUG|INFO|WARNING|ERROR|CRITICAL)\s+'
@@ -82,24 +81,10 @@ def _find_balanced(text: str, start: int) -> Optional[str]:
 
 def extract_structured_data(text: str):
     """
-    Find the first bracketed structure in a log line and parse it, if
-    possible. Tries real JSON first (covers lines that already embed
-    valid JSON, e.g. 'data: {"a": 1}'), then falls back to Python's
-    literal syntax via ast.literal_eval (covers dict/list/tuple reprs
-    like `str()`/`repr()` produce, e.g. "{'a': 1}", which is NOT valid
-    JSON but is exactly what a lot of Python apps log when they do
-    something like `logger.info(f"body | {payload}")`).
+    Find the first bracketed structure in a log line and parse it
 
-    Only '{' and '[' are treated as candidate start characters, '('
-    deliberately isn't, bare parentheses are extremely common in plain
-    English text ("see docs (here)") and would trigger constant failed
-    parse attempts for no benefit. A tuple nested inside a dict or list
-    is still caught fine, since the outer '{'/'[' is the trigger and
-    ast.literal_eval parses the whole nested structure in one pass.
-
-    Returns the parsed value (tuples get converted to lists so the
-    result is always JSON-serializable downstream), or None if nothing
-    parseable is found.
+    Returns the parsed value: result is always JSON-serializable downstream), 
+    or None if nothing parseable is found.
     """
     if not text:
         return None
@@ -142,9 +127,9 @@ def parse_log_line(raw_line: str, container_id: str, container_name: str,
         "logger": None,
         "message": raw_line,
         "raw": raw_line,
-        "source_timestamp": None,   # timestamp claimed by the log line itself
-        "received_at": datetime.now(timezone.utc),  # when we actually saw it
-        "parsed_data": None,        # structured value extracted from the line, if any
+        "source_timestamp": None,   
+        "received_at": datetime.now(timezone.utc),  
+        "parsed_data": None,        
     }
 
     m = PYLOG_RE.match(raw_line)
@@ -164,22 +149,17 @@ def parse_log_line(raw_line: str, container_id: str, container_name: str,
             if hint:
                 doc["level"] = hint.group(1).replace("WARN", "WARNING")
 
-    # runs once, regardless of which branch above matched, against the
-    # already-cleaned message (prefix like level/timestamp/logger already
-    # stripped where applicable, so the scan starts closer to the actual
-    # payload instead of re-scanning the whole raw line every time)
     doc["parsed_data"] = extract_structured_data(doc["message"])
 
     return doc
 
 
 if __name__ == "__main__":
-    # test straight against real and representative lines
     sample_lines = [
         "[2026-07-29 19:41:48 +0000] [1] [INFO] Starting gunicorn 23.0.0",
         "WARNING 2026-07-29 19:43:41,687 phone_locking.api API error response: imei_1 cannot be empty",
         "ERROR 2026-07-29 19:46:27,128 phone_locking.api API [lock-device] response: 'device_brand' is a required field.",
-        "INFO:AFRILOC:[TENANTS][DETAIL] body | {'user_id': 33, 'username': 'isaac', 'enterprise_code': 'TEST-002'}",
+        "INFO:DUKA:[STORE][DETAIL] body | {'user_id': 33, 'username': 'isaac', 'enterprise_code': 'TEST-002'}",
         'INFO:     172.18.0.7:38898 - "POST /api/v1/auth/login HTTP/1.0" 401 Unauthorized',
         '{"status":401,"elapsed_ms":279.5,"body":{"detail":"Invalid email or password"}}',
         "something totally unstructured a dev printed by accident",

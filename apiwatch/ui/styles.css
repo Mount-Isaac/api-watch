@@ -265,9 +265,6 @@ body {
 }
 
 /* ---------------- Responsive header controls ---------------- */
-/* two parallel control sets: desktop shows Dark Mode + Logout inline,
-   mobile swaps them for a single hamburger button + dropdown. Only one
-   set is ever visible at a time via the media query below. */
 .desktop-controls {
     display: inline-flex;
 }
@@ -370,10 +367,6 @@ body.light-mode .header-menu-item .icon-moon {
         display: inline-flex;
     }
 
-    /* the dot+"Live"+"|" duplicates the Live/Paused pill sitting right
-       next to it on small screens - on md/lg they're far enough apart
-       that it doesn't read as redundant, but here they're side by side
-       saying the same thing twice. Keep just the log count. */
     .status-live-indicator {
         display: none;
     }
@@ -774,9 +767,6 @@ body.light-mode .header-menu-item .icon-moon {
     font-size: 12px;
 }
 
-/* covers both the JSON tree and the plain-text <pre> fallback, since both
-   always render inside .detail-content - one rule keeps expanded-view
-   highlighting visually identical to the collapsed row's .message mark */
 .detail-content mark {
     background: var(--accent-dim);
     color: var(--accent);
@@ -895,8 +885,6 @@ body.light-mode .header-menu-item .icon-moon {
     justify-content: flex-start;
 }
 
-/* armed state - green accent bar, same visual language as the other
-   stat cards reacting to their own numbers */
 .alert-card.enabled {
     border-left-color: var(--success-text);
 }
@@ -907,9 +895,6 @@ body.light-mode .header-menu-item .icon-moon {
     align-items: center;
 }
 
-/* each config group (Channels, Threshold) gets its own micro-label -
-   without this the checkboxes/select just read as loose controls with
-   no indication of what they belong to */
 .alert-card-section {
     display: flex;
     flex-direction: column;
@@ -924,14 +909,6 @@ body.light-mode .header-menu-item .icon-moon {
     font-family: var(--font-mono);
     font-weight: 600;
 }
-
-/* real toggle switches instead of raw checkboxes - label on the left,
-   switch on the right, matches the settings-row pattern most people
-   already know from Slack/Linear/Stripe rather than a bare checkbox */
-/* Slack/Gmail toggles sit on one line instead of stacked rows - keeps
-   the card's height down, which matters because CSS grid stretches every
-   card in the row to match the tallest one (that's why a tall alert
-   card was making Active Containers etc. look oddly spacious before) */
 
 .alert-toggle-inline-row {
     display: flex;
@@ -1008,9 +985,6 @@ body.light-mode .header-menu-item .icon-moon {
     width: 100%;
 }
 
-/* select takes ~3/4 of the row, Save button the remaining ~1/4 - both
-   on one line instead of stacked, with a divider above marking this as
-   the action row */
 .alert-card-threshold-row {
     display: grid;
     grid-template-columns: 3fr 1fr;
@@ -1028,8 +1002,6 @@ body.light-mode .header-menu-item .icon-moon {
     justify-content: flex-end;
 }
 
-/* quiet confirmation, not a popup - fades in place and dismisses itself,
-   no color flash, no motion beyond a 2px settle */
 .alert-save-flash {
     font-size: 10px;
     font-family: var(--font-mono);
@@ -1051,12 +1023,6 @@ body.light-mode .header-menu-item .icon-moon {
     justify-content: center;
 }
 
-/* the previous version blended into the card at rest (same background
-   as the button's own non-hover state) and only barely differed on
-   hover, which is why it read as invisible. This version is clearly a
-   button in both themes even before you touch it: accent-tinted fill,
-   accent border, accent text. Hover deepens to a solid accent fill
-   with high-contrast text rather than just nudging opacity. */
 .alert-save-btn {
     background: var(--accent-dim);
     border: 1px solid var(--accent);
@@ -1133,9 +1099,6 @@ body.light-mode .header-menu-item .icon-moon {
     background-color: var(--bg-primary);
 }
 
-/* radar rings + soft glow, combined on one pseudo-element and faded out
-   toward the edges - kept off the real container so it never dims the
-   login card or the theme toggle sitting near the corner */
 .login-container::before {
     content: '';
     position: absolute;
@@ -1149,8 +1112,6 @@ body.light-mode .header-menu-item .icon-moon {
     pointer-events: none;
 }
 
-/* a faint rotating sweep, like a beacon scanning the dark - deliberately
-   subtle (low opacity) so it reads as atmosphere, not decoration */
 .login-container::after {
     content: '';
     position: absolute;

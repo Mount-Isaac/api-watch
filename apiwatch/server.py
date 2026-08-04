@@ -20,7 +20,6 @@ from .alerting import AlertManager
 
 SESSION_COOKIE_NAME = 'apiwatch_session'
 SESSION_TTL_SECONDS = int(os.getenv('APIWATCH_SESSION_TTL_SECONDS', str(24 * 3600)))
-# paths reachable without a valid session, everything else is gated
 PUBLIC_PATHS = {'/', '/auth'}
 PUBLIC_PREFIXES = ('/static/',)
 
@@ -46,8 +45,6 @@ class DashboardServer:
         self.runner = None
         db_path = Path(__file__).parent.parent / 'data' / 'apiwatch.db'
         self.db = AsyncDB(db_path)
-        # DockerCollector never touches db.init() itself, it just uses
-        # this same connection once we've initialized it in start()
         self.collector = DockerCollector(db=self.db, broadcast=self.broadcast)
         self.alerts = AlertManager(db=self.db)
     
@@ -68,8 +65,6 @@ class DashboardServer:
     async def broadcast(self, data: dict):
         """Push a record to every connected dashboard websocket client."""
         # fire-and-forget: alerting must never slow down or block the
-        # live dashboard stream, a slow Slack/Gmail call shouldn't add
-        # latency to what every connected browser sees
         asyncio.create_task(self.alerts.maybe_alert(data))
 
         if not self.ws_clients:
@@ -100,7 +95,7 @@ class DashboardServer:
         try:
             async for msg in ws:
                 if msg.type == web.WSMsgType.ERROR:
-                    print(f'[ApiWatchdog] WebSocket error: {ws.exception()}')
+                    print(f'[ApiWatch] WebSocket error: {ws.exception()}')
         finally:
             self.ws_clients.discard(ws)
         
@@ -115,9 +110,6 @@ class DashboardServer:
 
         submitted_user = data.get('username', '')
         submitted_pass = data.get('password', '')
-        # timing-safe comparison, a plain == leaks how many leading
-        # characters matched via response time, small thing but free
-        # to do right
         is_match = (
             hmac.compare_digest(submitted_user, self.username) and
             hmac.compare_digest(submitted_pass, self.password)
@@ -157,9 +149,9 @@ class DashboardServer:
             try:
                 removed = await self.db.cleanup_expired_sessions()
                 if removed:
-                    print(f'[ApiWatchdog] cleaned up {removed} expired sessions')
+                    print(f'[ApiWatch] cleaned up {removed} expired sessions')
             except Exception as exc:
-                print(f'[ApiWatchdog] session cleanup failed: {exc}')
+                print(f'[ApiWatch] session cleanup failed: {exc}')
 
     async def api_history_handler(self, request):
         page = int(request.query.get("page", 1))
@@ -175,19 +167,9 @@ class DashboardServer:
 
     async def api_containers_handler(self, request):
         """
-        Union of two sources: containers currently running (queried live
-        from the collector, so one only emitting levels below an
-        APIWATCH_LOG_LEVELS/alert threshold still shows up immediately,
-        instead of waiting for a row to actually land in the db), and
-        containers with historical rows in the db (so one that's since
-        stopped stays filterable by its past logs). Deduped via a set,
-        converted back to a sorted list before returning since a raw
-        Python set isn't JSON-serializable, web.json_response would
-        throw the moment there was ever an actual overlap to dedupe.
+        Union of two sources: containers currently running & stopped
         """
         containers = await self.collector._list_target_containers()
-        # _container_info does a `container.show()` call each, run them
-        # concurrently instead of one at a time in a comprehension
         info_results = await asyncio.gather(
             *[self.collector._container_info(c) for c in containers]
         )
@@ -207,8 +189,6 @@ class DashboardServer:
     async def api_alerts_availability_handler(self, request):
         """
         Which channels actually have credentials configured via env
-        vars, the UI uses this to grey out / warn on a channel before
-        the user tries to enable something that can't actually send.
         """
         return web.json_response(self.alerts.availability())
 
@@ -250,7 +230,6 @@ class DashboardServer:
 
         BASE_DIR = Path(__file__).parent / 'ui'
         self.app.router.add_static('/static', path=BASE_DIR, name='static')
-        print(f'base dir:{BASE_DIR}')
         self.app.router.add_get('/', self.dashboard_handler)
         self.app.router.add_get('/ws', self.websocket_handler)
         self.app.router.add_post('/auth', self.get_auth_credentials)
@@ -270,7 +249,6 @@ class DashboardServer:
         site = web.TCPSite(self.runner, self.host, self.port)
         await site.start()
         
-        # db is initialized above, collector only starts once that's done
         await self.collector.start()
         asyncio.create_task(self._session_cleanup_loop())
         
@@ -296,8 +274,6 @@ def is_dashboard_running(host='localhost', port=22222):
 def start_dashboard_server(host='0.0.0.0', port=22222, username='admin', password='admin'):
     """
     Start dashboard server (auto-start if not running)
-
-    Works like RabbitMQ - first app starts it, others connect
     """
     global _dashboard_server, _server_lock
     
@@ -309,8 +285,7 @@ def start_dashboard_server(host='0.0.0.0', port=22222, username='admin', passwor
             return None
         
         if is_dashboard_running(host, port):
-            print(f"[ApiWatchdog] Dashboard already running at http://{host}:{port}")
-            print(f"[ApiWatchdog] Connecting to existing dashboard...")
+            print(f"[ApiWatch] Dashboard already running at http://{host}:{port}")
             _dashboard_server = 'external'
             return None
         
@@ -341,7 +316,7 @@ async def run_standalone(host='0.0.0.0', port=22222, username='admin', password=
 
     width = 72
     line = "═" * width
-    version = os.getenv("version_number", "2.0.0")
+    version = "2.0.0"
 
     print(f"\n╔{line}╗")
     print(f"║{f'api-watch v{version} started':^{width}}║")
@@ -360,5 +335,5 @@ async def run_standalone(host='0.0.0.0', port=22222, username='admin', password=
     try:
         await asyncio.Event().wait()
     except KeyboardInterrupt:
-        print("\n[ApiWatchdog] Shutting down...")
+        print("\n[ApiWatch] Shutting down...")
         await server.stop()

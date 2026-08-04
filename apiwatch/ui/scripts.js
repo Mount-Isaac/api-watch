@@ -289,7 +289,7 @@ function renderAlertAvailabilityWarning() {
     if (slackWarnEl) {
         const show = slackEnabled && !alertAvailability.slack;
         if (show) {
-            slackWarnEl.textContent = "Slack isn't configured yet. APIWATCH_SLACK_WEBHOOK_URL is not set on the container.";
+            slackWarnEl.textContent = "Set APIWATCH_SLACK_WEBHOOK to enable Slack alerts.";
         }
         slackWarnEl.classList.toggle('hidden', !show);
     }
@@ -297,7 +297,7 @@ function renderAlertAvailabilityWarning() {
     if (gmailWarnEl) {
         const show = gmailEnabled && !alertAvailability.gmail;
         if (show) {
-            gmailWarnEl.textContent = "Gmail isn't configured yet. APIWATCH_GMAIL_USER / APIWATCH_GMAIL_APP_PASSWORD are not set on the container.";
+            gmailWarnEl.textContent = "Set APIWATCH_GMAIL_APP_PASS & APIWATCH_GMAIL to enable Gmail alerts.";
         }
         gmailWarnEl.classList.toggle('hidden', !show);
     }

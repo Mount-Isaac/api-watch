@@ -1,11 +1,6 @@
 """
 DockerCollector: watches container stdout/stderr via aiodocker and feeds
 parsed log lines into the dashboard's db + websocket broadcast.
-
-This class never owns the db connection or calls db.init(), server.py
-does that and hands over an already-initialized AsyncDB instance. That
-keeps a single source of truth for the db lifecycle instead of each
-piece opening its own connection.
 """
 import aiodocker
 import asyncio
@@ -98,10 +93,6 @@ class DockerCollector:
             os.getenv("APIWATCH_CLEANUP_INTERVAL_SECONDS", "3600")
         )
 
-        # optional allowlist of levels to actually keep, case-insensitive
-        # on input ("INFO", "info", "InFO" all normalize the same way).
-        # None means no filter, everything is kept, matching today's
-        # default behavior for anyone who hasn't set this
         raw_levels = os.getenv("APIWATCH_LOG_LEVELS")
         self.log_level_filter = (
             {lvl.strip().upper() for lvl in raw_levels.split(",") if lvl.strip()}
@@ -124,7 +115,6 @@ class DockerCollector:
         self._running = True
         self._poll_task = asyncio.create_task(self._poll_loop())
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())
-        # print("[ApiWatchdog] Docker collector started", flush=True)
 
     async def stop(self):
         """Call this from server.py's stop(). Does not touch the db."""
@@ -156,9 +146,6 @@ class DockerCollector:
     async def _list_target_containers(self):
         filters = None
         if not self.watch_all:
-            # NOTE: verify this filters shape against your installed
-            # aiodocker version, some releases expect a json.dumps'd
-            # string instead of a raw dict here
             filters = {"label": [self.label_filter]}
 
         containers = await self.docker.containers.list(filters=filters)
@@ -178,27 +165,17 @@ class DockerCollector:
     def _record_from_parsed(self, parsed: dict) -> dict:
         """
         Build the db record straight from the parser output. timestamp
-        always comes from received_at (a real datetime we generated),
-        never from source_timestamp, which is whatever raw string the
-        app itself printed (gunicorn's "+0000" format, Python logging's
-        comma-milliseconds format, neither of which is valid ISO 8601
-        and both of which broke Date parsing in the dashboard).
+        always comes from received_at (a real datetime we generated)
         """
         return {
             "id": str(uuid.uuid4()),
             "container_id": parsed["container_id"],
             "container_name": parsed["container_name"],
             "service": parsed["service_label"],
-            # normalized to uppercase here once, so storage, the env
-            # filter below, and level-based UI logic all agree, whether
-            # the source app printed "INFO", "info", or "InFO"
             "level": (parsed["level"] or "UNKNOWN").upper(),
             "logger": parsed["logger"],
             "message": parsed["message"],
             "raw": parsed["raw"],
-            # structured value extracted from the line by log_parser
-            # (JSON or Python dict/list/tuple repr), stored as a JSON
-            # string, None if the line had nothing structured in it
             "parsed_data": (
                 json.dumps(parsed["parsed_data"])
                 if parsed.get("parsed_data") is not None else None
@@ -222,13 +199,7 @@ class DockerCollector:
                 line = raw_line.rstrip("\n")
 
                 # parsing (especially the structured-data extraction inside
-                # parse_log_line) runs against arbitrary real-world text we
-                # don't control. This MUST stay scoped to a single line: if
-                # it's not caught here, the exception propagates out of the
-                # entire `async for`, hits the outer except below, and this
-                # container's stream dies completely, not just this one
-                # line. One malformed line should never be able to kill an
-                # otherwise-healthy stream.
+                # parse_log_line) runs against arbitrary real-world text
                 try:
                     parsed = parse_log_line(
                         raw_line=line,
@@ -245,19 +216,12 @@ class DockerCollector:
 
                 # checkpoint advances regardless of the filter below, a
                 # container that only ever emits filtered-out levels
-                # (e.g. pure DEBUG noise with APIWATCH_LOG_LEVELS=ERROR)
-                # still needs its checkpoint to move forward, otherwise
-                # every restart re-requests the same old backlog from
-                # docker just to filter it all out again
                 if now - last_checkpoint >= self.checkpoint_interval:
                     await self.db.set_checkpoint(container_id, container_name, int(now))
                     last_checkpoint = now
 
                 # env-configured allowlist, dropped here means gone for
                 # good, never stored, never broadcast, never printed.
-                # this is a deploy-time noise filter (e.g. skip DEBUG in
-                # prod), not a UI display filter, there's no getting it
-                # back later if the threshold turns out wrong
                 if self.log_level_filter and record["level"] not in self.log_level_filter:
                     continue
 
@@ -265,14 +229,11 @@ class DockerCollector:
 
                 # terminal output is just a heartbeat, not the actual
                 # log, the dashboard is where the real content lives.
-                # message is the field that actually carries the data,
-                # level/logger are sometimes null depending on what the
-                # app printed, message is the one thing always present
+                # message is the field that actually carries the data
                 print(f"{container_name}: {_preview_message(record['message'])}", flush=True)
 
                 # push live to the dashboard immediately, independent of
                 # the db batch flush below, so the UI doesn't lag behind
-                # just because we're batching writes
                 if self.broadcast:
                     await self.broadcast(record)
 
@@ -321,13 +282,7 @@ class DockerCollector:
                 still_live = cid in live_ids
                 # a task can finish on its own (an exception inside
                 # _stream_container that its own try/except swallowed,
-                # or the container's log stream simply ended). Without
-                # checking task.done() here, a dead task's id stays in
-                # self.watched forever, `cid not in self.watched` is
-                # never true again, and that container is never
-                # re-watched even though it's still running. This is
-                # what turned "one bad line" into "streaming is broken
-                # until the whole process restarts."
+                # or the container's log stream simply ended)
                 if not still_live or task.done():
                     if not task.done():
                         task.cancel()

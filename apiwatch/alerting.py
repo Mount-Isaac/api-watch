@@ -1,7 +1,7 @@
 """
 AlertManager: watches broadcasted log records and fires Slack and/or
-Gmail alerts when one crosses the severity threshold configured in the
-UI. Slack and Gmail are independent toggles - both can fire on the same
+Gmail alerts when one crosses the severity threshold configured. 
+Slack and Gmail are independent toggles - both can fire on the same
 log. Credentials come from env vars only, never stored in the db, only
 the channel toggles and threshold live there.
 """
@@ -34,10 +34,10 @@ class AlertManager:
     def __init__(self, db):
         self.db = db
 
-        self.slack_webhook = os.getenv('APIWATCH_SLACK_WEBHOOK_URL')
+        self.slack_webhook = os.getenv('APIWATCH_SLACK_WEBHOOK')
 
-        self.gmail_user = os.getenv('APIWATCH_GMAIL_USER')
-        self.gmail_app_password = os.getenv('APIWATCH_GMAIL_APP_PASSWORD')
+        self.gmail_user = os.getenv('APIWATCH_GMAIL')
+        self.gmail_app_password = os.getenv('APIWATCH_GMAIL_APP_PASS')
         self.gmail_smtp_host = os.getenv('APIWATCH_GMAIL_SMTP_HOST', 'smtp.gmail.com')
         self.gmail_smtp_port = int(os.getenv('APIWATCH_GMAIL_SMTP_PORT', '587'))
         # if no explicit recipient is set, alerts go to the sending
@@ -75,38 +75,15 @@ class AlertManager:
     async def maybe_alert(self, record: dict):
         """
         Call this with every log record, no-ops fast if nothing applies.
-
-        Everything up to and including the per-channel cooldown check
-        stays awaited inline - it's all cheap (a settings lookup, dict
-        comparisons) and the caller genuinely does need those checks to
-        happen in order, e.g. so a burst of records in the same tick
-        doesn't slip past the cooldown before self._last_sent gets
-        updated.
-
-        The actual network call (Slack webhook / SMTP) is the slow,
-        unpredictable part, so that's the piece that gets detached into
-        its own task per channel instead of being awaited here. Without
-        this, a caller doing `await alert_manager.maybe_alert(record)` in
-        the main log-ingestion loop would stall processing subsequent log
-        lines for however long Slack or Gmail take to respond (up to the
-        5s/10s timeouts below) - exactly when you least want ingestion
-        and the live websocket broadcast to lag.
-
         Slack and Gmail are independent toggles - both can fire on the
-        same record, each against its own cooldown clock, so one channel
-        being on cooldown never blocks the other from sending.
         """
         settings = await self.db.get_alert_settings()
         if not settings:
             return
 
-        # case-insensitive on both sides: env/UI-configured threshold and
-        # the level actually stored can each come from apps that emit
-        # INFO, info, or InFO depending on their own logging setup
         min_level = (settings.get('min_level') or 'ERROR').upper()
         level = (record.get('level') or 'UNKNOWN').upper()
 
-        # only fire at-or-worse than the configured threshold, lower
         # rank number means more severe
         if LEVEL_RANK.get(level, 5) > LEVEL_RANK.get(min_level, 1):
             return
@@ -126,7 +103,6 @@ class AlertManager:
             self._last_sent[channel] = now
 
             # dispatch and return immediately - the caller's await on
-            # maybe_alert() resolves now, not once Slack/Gmail respond
             task = asyncio.create_task(self._dispatch(channel, record))
             self._background_tasks.add(task)
             task.add_done_callback(self._background_tasks.discard)
@@ -147,7 +123,7 @@ class AlertManager:
             elif channel == 'gmail':
                 await self._send_gmail(record)
         except Exception as exc:
-            print(f'[ApiWatchdog] alert send failed ({channel}): {exc}', flush=True)
+            print(f'[ApiWatch] alert send failed ({channel}): {exc}', flush=True)
 
     # ---------------- shared formatting ----------------
     def _style_for(self, level: str) -> dict:
@@ -204,7 +180,7 @@ class AlertManager:
                 timeout=aiohttp.ClientTimeout(total=5)
             ) as resp:
                 if resp.status >= 300:
-                    print(f'[ApiWatchdog] slack alert rejected: {resp.status}', flush=True)
+                    print(f'[ApiWatch] slack alert rejected: {resp.status}', flush=True)
 
     # ---------------- Gmail ----------------
     def _format_html(self, record: dict) -> str:
@@ -221,9 +197,6 @@ class AlertManager:
               <a href="{escape(self.public_url)}" style="display:inline-block;padding:9px 18px;background:{style['color']};color:#0a0e14;text-decoration:none;border-radius:4px;font-family:'SFMono-Regular',Consolas,monospace;font-weight:bold;font-size:13px;">View live logs &rarr;</a>
             </td></tr>'''
 
-        # inline CSS throughout - most mail clients (Gmail included)
-        # strip <style> blocks, so anything that has to render correctly
-        # needs to be a style="" attribute on the element itself
         return f'''<!DOCTYPE html>
 <html>
   <body style="margin:0;padding:24px;background:#f4f4f2;font-family:-apple-system,'Segoe UI',sans-serif;">
@@ -260,10 +233,6 @@ class AlertManager:
 
     def _send_gmail_sync(self, subject: str, text_body: str, html_body: str):
         # multipart/alternative with plain text attached first, HTML
-        # second - clients render the last alternative they understand,
-        # so this order lets rich clients use the HTML while anything
-        # that can't (or that a user has set to prefer plain text) still
-        # gets a fully readable fallback rather than raw markup
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
         msg['From'] = self.gmail_user
