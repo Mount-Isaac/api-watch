@@ -56,7 +56,7 @@ docker run -d \
   -p 22222:22222 \
   -e WATCHDOG_USERNAME=admin \
   -e WATCHDOG_PASSWORD=changeme \
-  -v ./apiwatch-data:/app/data \
+  -v ./apiwatch-data:/app/apiwatch-data \
   -v /var/run/docker.sock:/var/run/docker.sock \
   theisaac/api-watch:latest
 ```
@@ -98,7 +98,7 @@ services:
       - WATCHDOG_USERNAME=${WATCHDOG_USERNAME}
       - WATCHDOG_PASSWORD=${WATCHDOG_PASSWORD}
     volumes:
-      - ./apiwatch-data:/app/data
+      - ./apiwatch-data:/app/apiwatch-data
       - /var/run/docker.sock:/var/run/docker.sock
 ```
 
