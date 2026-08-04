@@ -43,7 +43,8 @@ class DashboardServer:
         self.ws_clients = set()
         self.app = None
         self.runner = None
-        db_path = Path(__file__).parent.parent / 'data' / 'apiwatch.db'
+        db_path = Path(__file__).parent.parent / 'apiwatch-data' / 'apiwatch.db'
+        db_path.parent.mkdir(parents=True, exist_ok=True)
         self.db = AsyncDB(db_path)
         self.collector = DockerCollector(db=self.db, broadcast=self.broadcast)
         self.alerts = AlertManager(db=self.db)
