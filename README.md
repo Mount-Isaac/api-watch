@@ -1,10 +1,12 @@
 # api-watch
 
-**Live container log monitoring for small teams, without the Grafana+Loki weight.**
+**Stop grepping `docker logs`. Stop standing up Loki for a five-person team.**
 
-One container. No Redis, no separate log-shipping agent, no config sprawl. Point it at your Docker socket, get a live dashboard in under a minute.
+One container. No Redis, no log-shipping agent, no config sprawl. Point it at your Docker socket, get a live, searchable, alerting dashboard in under a minute.
 
 ![status](https://img.shields.io/badge/status-active-brightgreen) ![license](https://img.shields.io/badge/license-MIT-blue)
+
+![api-watch demo](./images/apiwatch-demo.mp4)
 
 ---
 
@@ -14,18 +16,18 @@ Grafana + Loki is the right tool once you've outgrown a single box. Until then, 
 
 api-watch sits in between:
 
-- **Real persistence.** SQLite-backed, configurable retention, survives restarts. Search, filter, and export logs from hours or days ago, not just what's streaming right now.
+- **Real persistence.** SQLite-backed, configurable retention, survives restarts. Search, filter, and export logs from hours or days ago — not just what's streaming right now.
 - **One container, zero dependencies.** No Redis, no Postgres, no separate ingestion pipeline.
-- **Actually readable JSON.** Structured log lines expand into a collapsible, syntax-highlighted tree, not a wall of escaped text.
+- **Actually readable JSON.** Structured log lines expand into a collapsible, syntax-highlighted tree — not a wall of escaped text.
 - **Alerting built in.** Slack and/or Gmail, fires on your chosen severity threshold, with cooldowns so a log flood doesn't flood your phone too.
-- **Built for small teams, not enterprises.** No SSO, no multi-host clustering, that's Grafana's job. If you need those, you've outgrown this tool, and that's fine.
+- **Built for small teams, not enterprises.** No SSO, no multi-host clustering — that's Grafana's job. If you need those, you've outgrown this tool, and that's fine.
 
 ## Features
 
 - Live-tailing container logs over WebSocket, with pause/resume so a busy stream doesn't yank rows out from under you mid-read
-- Server-side search across the full log history, not just what's loaded on screen
+- Server-side search across the full log history — not just what's loaded on screen — with matches highlighted in both keys and values of parsed JSON
 - Filter by level and container, sortable by time or severity
-- Auto-parses `logging` (All programming languages), and JSON log formats; falls back gracefully on anything else
+- Auto-parses `logging` output (any language) and JSON log formats; falls back gracefully on anything else
 - Expandable JSON tree view with copy-to-clipboard (pretty-printed)
 - Slack + Gmail alerting, independent toggles, per-channel cooldowns, configurable severity threshold
 - Real server-side session auth (not just a client-side flag)
@@ -72,7 +74,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 ```
 
-## Target docker container (eg Backend)
+## Target docker container (e.g. Backend)
+
 ```yaml
 services:
   backend:
@@ -81,7 +84,7 @@ services:
       - "5000:5000"
     restart: unless-stopped
     env_file:
-    - /opt/configs/.env
+      - /opt/configs/.env
     volumes:
       - /var/logs/backend:/app/logs
     labels:
@@ -109,10 +112,9 @@ All env vars are optional except credentials.
 | `APIWATCH_ALERT_COOLDOWN_SECONDS` | `300` | Minimum gap between alerts on the same channel |
 | `APIWATCH_PUBLIC_URL` | — | If set, alert emails include a link back to your dashboard |
 
-
 ## Data & retention
 
-Logs live in a SQLite file under `/app/data` inside the container, mount a volume there or you lose history on every restart. Logs older than `APIWATCH_RETENTION_HOURS` are swept automatically on an hourly timer. There's export-to-cold-storage step (export button on UI: saves history as json file on local disk)
+Logs live in a SQLite file under `/app/data` inside the container — mount a volume there or you lose history on every restart. Logs older than `APIWATCH_RETENTION_HOURS` are swept automatically on an hourly timer. There's an export-to-cold-storage step too: the export button on the UI saves filtered history as a JSON file to local disk.
 
 ## Known limitations
 
@@ -120,13 +122,13 @@ Being upfront about what this tool intentionally doesn't do:
 
 - Single shared login, no per-user accounts or SSO
 - Single Docker host, no cluster/multi-host aggregation
-- Search is `LIKE`-based, fine at this scale, not built for millions of rows
+- Search is `LIKE`-based — fine at this scale, not built for millions of rows
 
 If you need any of these, Grafana + Loki is genuinely the better tool for that job.
 
 ## Contributing
 
-Issues and PRs welcome. This started as an internal tool for a small startup's ops team, feedback from other small teams running it is exactly what shapes what gets built next.
+Issues and PRs welcome. This started as an internal tool for a small startup's ops team — feedback from other small teams running it is exactly what shapes what gets built next.
 
 ## License
 
@@ -136,4 +138,4 @@ MIT
 
 If this saved you from standing up Loki for a 5-person team, [buy me a coffee](https://ko-fi.com/isaackyalo) ☕
 
-Built by [Isaac Kyalo: GitHub](https://github.com/mount-isaac/api-watch)
+Built by [Isaac Kyalo — GitHub](https://github.com/mount-isaac/api-watch)
