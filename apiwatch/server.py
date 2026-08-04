@@ -317,12 +317,14 @@ async def run_standalone(host='0.0.0.0', port=22222, username='admin', password=
     width = 72
     line = "═" * width
     version = "2.0.0"
+    display_host = 'localhost' if host == '0.0.0.0' else host
+
 
     print(f"\n╔{line}╗")
     print(f"║{f'api-watch v{version} started':^{width}}║")
     print(f"╠{line}╣")
-    print(f"║ Dashboard        : http://{host}:{port}".ljust(width + 1) + "║")
-    print(f"║ WebSocket        : ws://{host}:{port}/ws".ljust(width + 1) + "║")
+    print(f"║ Dashboard        : http://{display_host}:{port}".ljust(width + 1) + "║")
+    print(f"║ WebSocket        : ws://{display_host}:{port}/ws".ljust(width + 1) + "║")
     print(
         f"║ Docker Collector : {'Watching ALL containers' if server.collector.watch_all else 'Watching labelled containers'}"
         .ljust(width + 1)

@@ -1,12 +1,12 @@
 services:
   apiwatch:
     image: theisaac/api-watch:latest
+    restart: unless-stopped
     ports:
       - "22222:22222"
-    restart: unless-stopped
-    env_file:
-      - .env
+    environment:
+      - WATCHDOG_USERNAME=${WATCHDOG_USERNAME}
+      - WATCHDOG_PASSWORD=${WATCHDOG_PASSWORD}
     volumes:
-      - ./data:/app/data
+      - ./apiwatch-data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock
-

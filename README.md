@@ -51,12 +51,13 @@ api-watch sits in between:
 
 ```bash
 docker run -d \
-  --name apiwatch \
+  --name api-watch \
+  --restart unless-stopped \
   -p 22222:22222 \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v apiwatch-data:/app/data \
   -e WATCHDOG_USERNAME=admin \
-  -e WATCHDOG_PASSWORD=password \
+  -e WATCHDOG_PASSWORD=changeme \
+  -v ./api-watch-data:/app/data \
+  -v /var/run/docker.sock:/var/run/docker.sock \
   theisaac/api-watch:latest
 ```
 
