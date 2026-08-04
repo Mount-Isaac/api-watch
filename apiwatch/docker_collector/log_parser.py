@@ -119,7 +119,7 @@ def extract_structured_data(text: str):
 
         try:
             value = ast.literal_eval(candidate)
-        except (ValueError, SyntaxError, MemoryError, RecursionError):
+        except (ValueError, SyntaxError, MemoryError, RecursionError, TypeError):
             continue
 
         if isinstance(value, tuple):

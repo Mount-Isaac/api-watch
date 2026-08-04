@@ -196,6 +196,13 @@ class DockerCollector:
             "logger": parsed["logger"],
             "message": parsed["message"],
             "raw": parsed["raw"],
+            # structured value extracted from the line by log_parser
+            # (JSON or Python dict/list/tuple repr), stored as a JSON
+            # string, None if the line had nothing structured in it
+            "parsed_data": (
+                json.dumps(parsed["parsed_data"])
+                if parsed.get("parsed_data") is not None else None
+            ),
             "timestamp": parsed["received_at"].isoformat(),
         }
 
@@ -213,13 +220,27 @@ class DockerCollector:
                 stdout=True, stderr=True, follow=True, since=since_ts
             ):
                 line = raw_line.rstrip("\n")
-                parsed = parse_log_line(
-                    raw_line=line,
-                    container_id=container_id,
-                    container_name=container_name,
-                    service_label=service_label,
-                )
-                record = self._record_from_parsed(parsed)
+
+                # parsing (especially the structured-data extraction inside
+                # parse_log_line) runs against arbitrary real-world text we
+                # don't control. This MUST stay scoped to a single line: if
+                # it's not caught here, the exception propagates out of the
+                # entire `async for`, hits the outer except below, and this
+                # container's stream dies completely, not just this one
+                # line. One malformed line should never be able to kill an
+                # otherwise-healthy stream.
+                try:
+                    parsed = parse_log_line(
+                        raw_line=line,
+                        container_id=container_id,
+                        container_name=container_name,
+                        service_label=service_label,
+                    )
+                    record = self._record_from_parsed(parsed)
+                except Exception as exc:
+                    print(f"[ApiWatchdog] failed to parse a line from {container_name}: {exc}", flush=True)
+                    continue
+
                 now = time.time()
 
                 # checkpoint advances regardless of the filter below, a
@@ -296,8 +317,20 @@ class DockerCollector:
                     print(f"now watching {name}", flush=True)
 
             for cid in list(self.watched):
-                if cid not in live_ids:
-                    self.watched[cid].cancel()
+                task = self.watched[cid]
+                still_live = cid in live_ids
+                # a task can finish on its own (an exception inside
+                # _stream_container that its own try/except swallowed,
+                # or the container's log stream simply ended). Without
+                # checking task.done() here, a dead task's id stays in
+                # self.watched forever, `cid not in self.watched` is
+                # never true again, and that container is never
+                # re-watched even though it's still running. This is
+                # what turned "one bad line" into "streaming is broken
+                # until the whole process restarts."
+                if not still_live or task.done():
+                    if not task.done():
+                        task.cancel()
                     del self.watched[cid]
 
             # checkpoints get pruned when a container disappears, the

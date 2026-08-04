@@ -427,7 +427,7 @@ function escapeHtml(str) {
 
 function renderJsonNode(value, keyLabel, depth, term) {
     const keyHtml = keyLabel !== null
-        ? `<span class="json-key">"${escapeHtml(keyLabel)}"</span>: `
+        ? `<span class="json-key">"${highlightMatch(String(keyLabel), term)}"</span>: `
         : '';
 
     if (value === null) {
@@ -487,7 +487,52 @@ function toggleJsonNode(clickedEl) {
     if (icon) icon.textContent = isCollapsed ? '\u25B8' : '\u25BE';
 }
 
-function renderDetailContent(text, term) {
+// function renderDetailContent(text, parsedDataJson) {
+//     // parsed_data comes from the backend already correctly parsed
+//     // (handles Python dict repr like {'ok': True}, which JSON.parse
+//     // can never handle since it's not valid JSON syntax). Prefer it
+//     // whenever the backend found something, only fall back to trying
+//     // to parse the raw string ourselves if it didn't.
+//     if (parsedDataJson) {
+//         try {
+//             const parsed = JSON.parse(parsedDataJson);
+//             if (parsed !== null && typeof parsed === 'object') {
+//                 return `<div class="json-tree">${renderJsonNode(parsed, null, 0)}</div>`;
+//             }
+//         } catch (e) {
+//             // fall through
+//         }
+//     }
+
+//     if (!text) return '';
+//     try {
+//         const parsed = JSON.parse(text);
+//         if (parsed !== null && typeof parsed === 'object') {
+//             return `<div class="json-tree">${renderJsonNode(parsed, null, 0)}</div>`;
+//         }
+//     } catch (e) {
+//         // not JSON, fall through to plain text
+//     }
+//     return `<pre>${escapeHtml(text)}</pre>`;
+// }
+
+function renderDetailContent(text, parsedDataJson, term) {
+    // parsed_data comes from the backend already correctly parsed
+    // (handles Python dict repr like {'ok': True}, which JSON.parse
+    // can never handle since it's not valid JSON syntax). Prefer it
+    // whenever the backend found something, only fall back to trying
+    // to parse the raw string ourselves if it didn't.
+    if (parsedDataJson) {
+        try {
+            const parsed = JSON.parse(parsedDataJson);
+            if (parsed !== null && typeof parsed === 'object') {
+                return `<div class="json-tree">${renderJsonNode(parsed, null, 0, term)}</div>`;
+            }
+        } catch (e) {
+            // fall through
+        }
+    }
+
     if (!text) return '';
     try {
         const parsed = JSON.parse(text);
@@ -499,6 +544,19 @@ function renderDetailContent(text, term) {
     }
     return `<pre>${highlightMatch(text, term)}</pre>`;
 }
+
+// function renderDetailContent(text, term) {
+//     if (!text) return '';
+//     try {
+//         const parsed = JSON.parse(text);
+//         if (parsed !== null && typeof parsed === 'object') {
+//             return `<div class="json-tree">${renderJsonNode(parsed, null, 0, term)}</div>`;
+//         }
+//     } catch (e) {
+//         // not JSON, fall through to plain text
+//     }
+//     return `<pre>${highlightMatch(text, term)}</pre>`;
+// }
 
 function findRequestById(id) {
     return allRequests.find(r => String(r.id) === String(id));
@@ -626,7 +684,7 @@ function renderRequest(req) {
             </div>
             <div class="request-details ${expandedSet.has(req.id) ? 'open' : ''}">
                 ${req.logger ? `<div class="detail-section"><div class="detail-label-row"><span class="detail-label">Logger</span><button class="copy-btn" onclick="copyDetailField('${req.id}', 'logger', this)">Copy</button></div><div class="detail-content"><pre>${highlightMatch(req.logger, term)}</pre></div></div>` : ''}
-                ${req.raw ? `<div class="detail-section"><div class="detail-label-row"><span class="detail-label">Raw Line</span><button class="copy-btn" onclick="copyDetailField('${req.id}', 'raw', this)">Copy</button></div><div class="detail-content">${renderDetailContent(req.raw, term)}</div></div>` : ''}
+                ${req.raw ? `<div class="detail-section"><div class="detail-label-row"><span class="detail-label">Raw Line</span><button class="copy-btn" onclick="copyDetailField('${req.id}', 'raw', this)">Copy</button></div><div class="detail-content">${renderDetailContent(req.raw, req.parsed_data, term)}</div></div>` : ''}
             </div>
         </div>`;
 }
