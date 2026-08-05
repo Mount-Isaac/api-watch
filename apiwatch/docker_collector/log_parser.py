@@ -1,17 +1,7 @@
 """
 Shape raw log lines into structured documents.
-
 Real containers emit multiple log formats from the same stdout stream,
-This parser tries known formats first and falls back to a raw record rather
-than dropping or crashing on anything it doesn't recognize. A log
-collector that throws away lines it can't parse is worse than useless,
-you lose exactly the weird lines you'd want to see.
 
-Phase 3: on top of level/logger/message extraction, every line is also
-scanned for an embedded structured value (dict, list, or tuple) and, if
-found, parsed into `parsed_data`. This runs once here rather than in the
-UI, so search, export, and alerts all benefit from it too, not just the
-JSON tree view.
 """
 
 import ast
@@ -35,8 +25,14 @@ PYLOG_RE = re.compile(
     r'(?P<logger>\S+)\s+(?P<message>.*)$'
 )
 
-# fallback: does the line at least mention a level keyword anywhere,
-# so a line we can't fully parse still gets bucketed sensibly
+# docker-compose stdout prefix
+COMPOSE_PREFIX_RE = re.compile(
+    r'^(?P<service>\S+)\s*\|\s*'
+    r'(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)\s*'
+    r'(?P<rest>.*)$'
+)
+
+# fallback
 LEVEL_HINT_RE = re.compile(r'\b(CRITICAL|ERROR|WARNING|WARN|INFO|DEBUG)\b')
 
 
@@ -44,9 +40,7 @@ def _find_balanced(text: str, start: int) -> Optional[str]:
     """
     Starting at an opening bracket, walk forward tracking nesting depth
     and quoted-string state (so a '}' inside a string value doesn't end
-    the match early), return the substring up to and including the
-    matching close bracket, or None if it never balances (truncated
-    line, mismatched brackets, log line got cut off mid-write, etc).
+    the match early), return the substring
     """
     open_char = text[start]
     close_char = {'{': '}', '[': ']', '(': ')'}[open_char]
@@ -145,9 +139,18 @@ def parse_log_line(raw_line: str, container_id: str, container_name: str,
             doc["message"] = m.group("message")
             doc["source_timestamp"] = m.group("timestamp")
         else:
-            hint = LEVEL_HINT_RE.search(raw_line)
+            # Not a recognized structured format. Strip a docker-compose
+            body_for_hint = raw_line
+            m = COMPOSE_PREFIX_RE.match(raw_line)
+            if m:
+                doc["message"] = m.group("rest")
+                doc["source_timestamp"] = m.group("timestamp")
+                body_for_hint = m.group("rest")
+
+            hint = LEVEL_HINT_RE.search(body_for_hint)
             if hint:
                 doc["level"] = hint.group(1).replace("WARN", "WARNING")
+            # else: level stays "UNKNOWN" -- doc is still returned, never dropped.
 
     doc["parsed_data"] = extract_structured_data(doc["message"])
 
@@ -163,8 +166,9 @@ if __name__ == "__main__":
         'INFO:     172.18.0.7:38898 - "POST /api/v1/auth/login HTTP/1.0" 401 Unauthorized',
         '{"status":401,"elapsed_ms":279.5,"body":{"detail":"Invalid email or password"}}',
         "something totally unstructured a dev printed by accident",
+        'whatsapp  | 2026-08-04T23:54:23.586311981Z {"type":"dm","phone":"254759856000","name":"Isaac","message":"","webhook_called":true,"response":null,"error":"Error: connect ECONNREFUSED 127.0.0.1:15000"}',
     ]
 
     for line in sample_lines:
         parsed = parse_log_line(line, "abc123", "django_app-django-1", "django_app")
-        print(f"{parsed['level']:<8} logger={parsed['logger']!s:<20} parsed_data={parsed['parsed_data']}")
+        print(f"{parsed['level']:<8} logger={parsed['logger']!s:<20} ts={parsed['source_timestamp']!s:<32} parsed_data={parsed['parsed_data']}")

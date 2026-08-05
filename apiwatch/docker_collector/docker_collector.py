@@ -93,7 +93,7 @@ class DockerCollector:
             os.getenv("APIWATCH_CLEANUP_INTERVAL_SECONDS", "3600")
         )
 
-        raw_levels = os.getenv("APIWATCH_LOG_LEVELS")
+        raw_levels = os.getenv("APIWATCH_LOG_LEVELS", "ERROR,WARNING,CRITICAL,INFO,UNKNOWN,DEBUG")
         self.log_level_filter = (
             {lvl.strip().upper() for lvl in raw_levels.split(",") if lvl.strip()}
             if raw_levels else None
