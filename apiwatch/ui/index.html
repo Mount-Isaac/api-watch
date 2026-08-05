@@ -5,15 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>api-watch - Live Logs</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" />
     <link rel="stylesheet" href="/static/styles.css" />
     <link rel="icon" type="image/png" href="/static/logo.png" />
   </head>
   <body>
-    <!-- 
-      Loading gate - shown until the /api/me auth check resolves, so we
-      never flash the login page for a second before redirecting into
-      the dashboard on a valid session.
-    -->
     <div id="app-loading" class="app-loading">
       <div class="app-loading-mark">api-watch<span class="cursor-blink"></span></div>
       <div class="loading-dots">
@@ -61,7 +57,7 @@
     <div id="dashboard" class="hidden">
       <div class="header">
         <div class="header-left">
-          <h1>api-watch<span class="cursor-blnk"></span></h1>
+          <h1>api-watch<span></span></h1>
           <div class="status">
             <span class="status-live-indicator">
               <span class="status-dot" id="status-dot"></span>

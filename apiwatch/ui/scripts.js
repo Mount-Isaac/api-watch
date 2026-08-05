@@ -15,6 +15,7 @@ const ERROR_LEVELS = new Set(['CRITICAL', 'ERROR']);
 const ALL_LEVELS = ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'UNKNOWN'];
 const PAGE_SIZES = [10, 20, 30, 50, 100];
 
+let activeViewId = null;
 let expandedSet = new Set();
 let allRequests = [];
 let ws;
@@ -630,7 +631,7 @@ function renderRequest(req) {
     const timeLabel = timestamp && !isNaN(timestamp) ? timestamp.toLocaleTimeString() : '---';
 
     return `
-        <div class="request-item" data-id="${req.id}" data-level="${level}">
+        <div class="request-item ${String(activeViewId) === String(req.id) ? 'active-view' : ''}" data-id="${req.id}" data-level="${level}">
             <div class="request-header" onclick="toggleDetails(this)">
                 ${containerBadge}
                 <span class="level level-${level}">${level}</span>
@@ -645,11 +646,23 @@ function renderRequest(req) {
 }
 
 function toggleDetails(header) {
-    const id = header.parentElement.dataset.id;
+    const item = header.parentElement;
+    const id = item.dataset.id;
     const details = header.nextElementSibling;
     details.classList.toggle('open');
     if (details.classList.contains('open')) expandedSet.add(id);
     else expandedSet.delete(id);
+
+    setActiveView(id);
+}
+
+function setActiveView(id) {
+    activeViewId = id;
+    document.querySelectorAll('.request-item.active-view').forEach(el => {
+        el.classList.remove('active-view');
+    });
+    const item = requestsEl.querySelector(`.request-item[data-id="${id}"]`);
+    if (item) item.classList.add('active-view');
 }
 
 // ---------------- Filters & Sorting ----------------
