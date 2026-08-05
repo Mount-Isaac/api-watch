@@ -317,7 +317,7 @@ async def run_standalone(host='0.0.0.0', port=22222, username='admin', password=
 
     width = 72
     line = "═" * width
-    version = "2.0.0"
+    version = "2.1.0"
     display_host = 'localhost' if host == '0.0.0.0' else host
 
 
